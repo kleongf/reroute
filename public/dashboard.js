@@ -111,3 +111,15 @@ source.addEventListener('state', (event) => {
 requireElement('reset').addEventListener('click', () => {
   void fetch('/api/reset', { method: 'POST' });
 });
+
+// PROTOTYPE hook (throwaway, branch prototype/dashboard-ui): `?variant=A|B|C` swaps in a
+// prototype layout from /prototype/ that consumes the same snapshot stream.
+if (new URLSearchParams(location.search).has('variant')) {
+  requireElement('dashboard').hidden = true;
+  const prototypeUrl = '/prototype/variants.js';
+  /** @type {Promise<{ start: (deps: { onSnapshot: (fn: (s: Snapshot) => void) => void }) => void }>} */
+  const prototype = import(prototypeUrl);
+  void prototype.then((mod) => {
+    mod.start({ onSnapshot: (fn) => snapshotListeners.push(fn) });
+  });
+}
