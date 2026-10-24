@@ -6,6 +6,9 @@ import { loadConfig } from './config.ts';
 import { openDatabase } from './db.ts';
 import { systemClock } from './domain/clock.ts';
 import { log } from './log.ts';
+import { loadScenario, readScenarioFile } from './store/scenario.ts';
+import { createStore } from './store/store.ts';
+import { createFakeVoice } from './voice/port.ts';
 
 if (existsSync('.env')) {
   // Does not override variables already set in the environment.
@@ -17,7 +20,22 @@ const db = openDatabase(config.DATABASE_PATH);
 // Resolves to <repo>/public from both src/server.ts (tsx) and dist/server.js (build).
 const publicDir = fileURLToPath(new URL('../public/', import.meta.url));
 
-const app = createApp({ db, clock: systemClock, heartbeatMs: config.HEARTBEAT_MS, publicDir });
+const scenario = readScenarioFile(fileURLToPath(new URL('../fixtures/demo.json', import.meta.url)));
+const phones = process.env;
+const store = createStore(db, loadScenario(scenario, systemClock.now(), phones));
+// Replaced by the Retell implementation in #6.
+const voice = createFakeVoice();
+
+const app = createApp({
+  db,
+  clock: systemClock,
+  heartbeatMs: config.HEARTBEAT_MS,
+  publicDir,
+  store,
+  scenario,
+  phones,
+  voice,
+});
 
 const server = serve({ fetch: app.fetch, port: config.PORT }, (info) => {
   log('info', 'listening', { port: info.port, url: `http://localhost:${String(info.port)}` });

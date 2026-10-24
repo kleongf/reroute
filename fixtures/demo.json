@@ -1,0 +1,120 @@
+{
+  "drivers": [
+    {
+      "id": "alex",
+      "name": "Alex",
+      "phoneEnv": "DRIVER_PHONE_ALEX",
+      "simulated": false,
+      "position": { "lat": 37.7599, "lng": -122.4148 },
+      "capacity": 2,
+      "availableFromOffsetMin": -180,
+      "availableUntilOffsetMin": 300
+    },
+    {
+      "id": "blair",
+      "name": "Blair",
+      "phoneEnv": null,
+      "simulated": true,
+      "position": { "lat": 37.7726, "lng": -122.4312 },
+      "capacity": 2,
+      "availableFromOffsetMin": -180,
+      "availableUntilOffsetMin": 300
+    },
+    {
+      "id": "casey",
+      "name": "Casey",
+      "phoneEnv": "DRIVER_PHONE_CASEY",
+      "simulated": false,
+      "position": { "lat": 37.7793, "lng": -122.4192 },
+      "capacity": 3,
+      "availableFromOffsetMin": -180,
+      "availableUntilOffsetMin": 300
+    },
+    {
+      "id": "dana",
+      "name": "Dana",
+      "phoneEnv": null,
+      "simulated": false,
+      "position": { "lat": 37.7648, "lng": -122.4632 },
+      "capacity": 4,
+      "availableFromOffsetMin": -240,
+      "availableUntilOffsetMin": 20
+    },
+    {
+      "id": "eli",
+      "name": "Eli",
+      "phoneEnv": null,
+      "simulated": false,
+      "position": { "lat": 37.7935, "lng": -122.3965 },
+      "capacity": 0,
+      "availableFromOffsetMin": -180,
+      "availableUntilOffsetMin": 300
+    },
+    {
+      "id": "fran",
+      "name": "Fran",
+      "phoneEnv": null,
+      "simulated": false,
+      "position": { "lat": 37.7281, "lng": -122.4769 },
+      "capacity": 3,
+      "availableFromOffsetMin": -180,
+      "availableUntilOffsetMin": 300
+    }
+  ],
+  "jobs": [
+    {
+      "id": "J17",
+      "label": "Oak Street pickup",
+      "pickup": { "name": "Oak Street Florist", "lat": 37.7745, "lng": -122.4264 },
+      "dropoff": { "name": "Mission Bay Clinic", "lat": 37.7684, "lng": -122.3912 },
+      "parcels": 2,
+      "deadlineOffsetMin": 60,
+      "serviceMinutes": 3,
+      "tripMinutes": 15,
+      "driverId": "alex"
+    },
+    {
+      "id": "J18",
+      "label": "Valencia Street pickup",
+      "pickup": { "name": "Valencia Books", "lat": 37.7635, "lng": -122.4216 },
+      "dropoff": { "name": "Potrero Hill Office", "lat": 37.7587, "lng": -122.4009 },
+      "parcels": 1,
+      "deadlineOffsetMin": 90,
+      "serviceMinutes": 3,
+      "tripMinutes": 10,
+      "driverId": "casey"
+    },
+    {
+      "id": "J19",
+      "label": "Embarcadero pickup",
+      "pickup": { "name": "Ferry Building Market", "lat": 37.7955, "lng": -122.3937 },
+      "dropoff": { "name": "North Beach Cafe", "lat": 37.8003, "lng": -122.4101 },
+      "parcels": 3,
+      "deadlineOffsetMin": 75,
+      "serviceMinutes": 3,
+      "tripMinutes": 12,
+      "driverId": "eli"
+    }
+  ],
+  "etaMinutes": {
+    "alex": { "J17": 10, "J18": 6, "J19": 25 },
+    "blair": { "J17": 5, "J18": 12, "J19": 20 },
+    "casey": { "J17": 9, "J18": 8, "J19": 14 },
+    "dana": { "J17": 14, "J18": 18, "J19": 30 },
+    "eli": { "J17": 18, "J18": 22, "J19": 4 },
+    "fran": { "J17": 48, "J18": 40, "J19": 50 }
+  },
+  "trafficEvents": [
+    {
+      "id": "i280",
+      "label": "I-280 closed",
+      "path": [
+        [37.7334, -122.4062],
+        [37.7489, -122.4031],
+        [37.7612, -122.4058],
+        [37.7699, -122.4011]
+      ],
+      "addedMinutes": { "alex": 40 }
+    }
+  ]
+}

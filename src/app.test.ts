@@ -1,30 +1,20 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { DatabaseSync } from 'node:sqlite';
-import { createApp } from './app.ts';
-import { openDatabase } from './db.ts';
-import { createManualClock } from './domain/clock.ts';
+import { createHarness, type Harness } from './testing/harness.ts';
 
 describe('createApp', () => {
+  let h: Harness;
+  let app: Harness['app'];
   let db: DatabaseSync;
-  let app: ReturnType<typeof createApp>;
 
   beforeEach(() => {
-    db = openDatabase(':memory:');
-    const publicDir = mkdtempSync(join(tmpdir(), 'reroute-public-'));
-    writeFileSync(join(publicDir, 'index.html'), '<h1>Reroute</h1>');
-    app = createApp({
-      db,
-      clock: createManualClock(new Date('2026-10-24T14:00:00.000Z')),
-      heartbeatMs: 1_000,
-      publicDir,
-    });
+    h = createHarness();
+    app = h.app;
+    db = h.db;
   });
 
   afterEach(() => {
-    db.close();
+    h.close();
   });
 
   it('GET /health reports ok with the clock time', async () => {

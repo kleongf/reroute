@@ -4,6 +4,9 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { Clock } from './domain/clock.ts';
 import { retellWebhookSchema } from './retell/schemas.ts';
+import { loadScenario, type PhoneBook, type Scenario } from './store/scenario.ts';
+import { toSnapshot, type Store } from './store/store.ts';
+import type { VoicePort } from './voice/port.ts';
 
 export interface AppDeps {
   readonly db: DatabaseSync;
@@ -11,6 +14,10 @@ export interface AppDeps {
   readonly heartbeatMs: number;
   /** Directory holding the dashboard's static files. */
   readonly publicDir: string;
+  readonly store: Store;
+  readonly scenario: Scenario;
+  readonly phones: PhoneBook;
+  readonly voice: VoicePort;
 }
 
 export function createApp(deps: AppDeps): Hono {
@@ -31,13 +38,25 @@ export function createApp(deps: AppDeps): Hono {
       const send = (event: string, data: unknown) =>
         stream.writeSSE({ event, data: JSON.stringify(data), id: String(id++) });
 
+      const sendState = () => send('state', toSnapshot(deps.store.get(), deps.clock.now()));
+      const unsubscribe = deps.store.subscribe(() => void sendState());
+      stream.onAbort(unsubscribe);
+
       await send('hello', { time: deps.clock.now().toISOString() });
+      await sendState();
       while (!stream.aborted && !stream.closed) {
         await send('heartbeat', { time: deps.clock.now().toISOString() });
         await stream.sleep(deps.heartbeatMs);
       }
     }),
   );
+
+  app.get('/api/state', (c) => c.json(toSnapshot(deps.store.get(), deps.clock.now())));
+
+  app.post('/api/reset', (c) => {
+    deps.store.replace(loadScenario(deps.scenario, deps.clock.now(), deps.phones));
+    return c.json(toSnapshot(deps.store.get(), deps.clock.now()));
+  });
 
   app.post('/webhooks/retell', async (c) => {
     let body: unknown;
