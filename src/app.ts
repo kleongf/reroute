@@ -3,7 +3,9 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { Clock } from './domain/clock.ts';
+import type { Engine } from './placement/engine.ts';
 import { retellWebhookSchema } from './retell/schemas.ts';
+import { registerTools } from './retell/tools.ts';
 import { loadScenario, type PhoneBook, type Scenario } from './store/scenario.ts';
 import { toSnapshot, type Store } from './store/store.ts';
 import type { VoicePort } from './voice/port.ts';
@@ -18,6 +20,7 @@ export interface AppDeps {
   readonly scenario: Scenario;
   readonly phones: PhoneBook;
   readonly voice: VoicePort;
+  readonly engine: Engine;
 }
 
 export function createApp(deps: AppDeps): Hono {
@@ -57,6 +60,8 @@ export function createApp(deps: AppDeps): Hono {
     deps.store.replace(loadScenario(deps.scenario, deps.clock.now(), deps.phones));
     return c.json(toSnapshot(deps.store.get(), deps.clock.now()));
   });
+
+  registerTools(app, { engine: deps.engine, store: deps.store });
 
   app.post('/webhooks/retell', async (c) => {
     let body: unknown;

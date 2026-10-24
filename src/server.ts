@@ -6,6 +6,7 @@ import { loadConfig } from './config.ts';
 import { openDatabase } from './db.ts';
 import { systemClock } from './domain/clock.ts';
 import { log } from './log.ts';
+import { createEngine } from './placement/engine.ts';
 import { loadScenario, readScenarioFile } from './store/scenario.ts';
 import { createStore } from './store/store.ts';
 import { createFakeVoice } from './voice/port.ts';
@@ -25,6 +26,12 @@ const phones = process.env;
 const store = createStore(db, loadScenario(scenario, systemClock.now(), phones));
 // Replaced by the Retell implementation in #6.
 const voice = createFakeVoice();
+const engine = createEngine({
+  store,
+  clock: systemClock,
+  voice,
+  dispatcherPhone: process.env['DISPATCHER_PHONE'] ?? null,
+});
 
 const app = createApp({
   db,
@@ -35,6 +42,7 @@ const app = createApp({
   scenario,
   phones,
   voice,
+  engine,
 });
 
 const server = serve({ fetch: app.fetch, port: config.PORT }, (info) => {

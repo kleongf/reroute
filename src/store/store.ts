@@ -1,4 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite';
+import { comparePriority } from '../domain/priority.ts';
 import type { StateSnapshot, World } from '../domain/types.ts';
 
 /**
@@ -42,18 +43,10 @@ export function createStore(db: DatabaseSync, initial: World): Store {
   };
 }
 
-const tierRank = { high: 0, normal: 1 } as const;
-
 export function toSnapshot(world: World, now: Date): StateSnapshot {
-  const deadlineOf = (jobId: string) => world.jobs.find((j) => j.id === jobId)?.deadline ?? '';
   const queue = world.placements
     .filter((p) => p.status === 'queued')
-    .sort(
-      (a, b) =>
-        tierRank[a.tier] - tierRank[b.tier] ||
-        deadlineOf(a.jobId).localeCompare(deadlineOf(b.jobId)) ||
-        a.queuedAt.localeCompare(b.queuedAt),
-    )
+    .sort((a, b) => comparePriority(a, b, world.jobs))
     .map((p) => p.id);
   return {
     now: now.toISOString(),
