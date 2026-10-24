@@ -1,0 +1,19 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "types": ["vite/client"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": false,
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@backend/*": ["../src/*"]
+    },
+    "noEmit": true
+  },
+  "include": ["src"]
+}

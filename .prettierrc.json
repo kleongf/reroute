@@ -1,4 +1,13 @@
 {
   "printWidth": 100,
-  "singleQuote": true
+  "singleQuote": true,
+  "overrides": [
+    {
+      "files": "web/**",
+      "options": {
+        "plugins": ["prettier-plugin-tailwindcss"],
+        "tailwindStylesheet": "./web/src/index.css"
+      }
+    }
+  ]
 }

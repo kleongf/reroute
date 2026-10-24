@@ -22,6 +22,8 @@ const config = loadConfig();
 const db = openDatabase(config.DATABASE_PATH);
 // Resolves to <repo>/public from both src/server.ts (tsx) and dist/server.js (build).
 const publicDir = fileURLToPath(new URL('../public/', import.meta.url));
+// The web/ build (pnpm build); both entry points resolve to <repo>/dist/web.
+const webDir = fileURLToPath(new URL('../dist/web/', import.meta.url));
 
 const scenario = readScenarioFile(fileURLToPath(new URL('../fixtures/demo.json', import.meta.url)));
 const phones = process.env;
@@ -45,6 +47,7 @@ const app = createApp({
   clock: systemClock,
   heartbeatMs: config.HEARTBEAT_MS,
   publicDir,
+  webDir,
   store,
   scenario,
   phones,

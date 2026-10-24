@@ -9,10 +9,12 @@
   },
   "packageManager": "pnpm@10.18.2",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "dev": "concurrently -k -n api,web -c blue,magenta \"pnpm run dev:api\" \"pnpm run dev:web\"",
+    "dev:api": "tsx watch src/server.ts",
+    "dev:web": "pnpm --filter @reroute/web dev",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json && pnpm --filter @reroute/web build",
     "start": "node dist/server.js",
-    "typecheck": "tsc -p tsconfig.json && tsc -p public/tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p public/tsconfig.json && pnpm --filter @reroute/web typecheck",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
@@ -25,7 +27,7 @@
     "prepare": "husky"
   },
   "lint-staged": {
-    "*.{ts,js}": [
+    "*.{ts,tsx,js}": [
       "prettier --write",
       "eslint --fix --max-warnings 0 --no-warn-ignored"
     ],
@@ -41,12 +43,15 @@
     "@playwright/test": "^1.64.1",
     "@types/leaflet": "^1.9.22",
     "@types/node": "^26.6.5",
+    "concurrently": "^10.0.6",
     "eslint": "^10.13.0",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.13.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.6.0",
     "prettier": "^3.9.10",
+    "prettier-plugin-tailwindcss": "^0.8.1",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.72.0",
