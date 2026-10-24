@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { Clock } from './domain/clock.ts';
 import type { Engine } from './placement/engine.ts';
+import { registerUrgentJobs } from './placement/urgent-route.ts';
 import { retellWebhookSchema } from './retell/schemas.ts';
 import { registerTools } from './retell/tools.ts';
 import { loadScenario, type PhoneBook, type Scenario } from './store/scenario.ts';
@@ -62,6 +63,7 @@ export function createApp(deps: AppDeps): Hono {
   });
 
   registerTools(app, { engine: deps.engine, store: deps.store });
+  registerUrgentJobs(app, { engine: deps.engine, store: deps.store, clock: deps.clock });
 
   app.post('/webhooks/retell', async (c) => {
     let body: unknown;

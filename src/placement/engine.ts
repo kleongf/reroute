@@ -1,5 +1,6 @@
 import type { Clock } from '../domain/clock.ts';
 import { evaluate } from '../domain/eligibility.ts';
+import { etaMinutesBetween } from '../domain/eta.ts';
 import { comparePriority } from '../domain/priority.ts';
 import { spokenTime } from '../domain/time.ts';
 import type {
@@ -9,7 +10,9 @@ import type {
   Job,
   JobId,
   OfferId,
+  Place,
   Placement,
+  Tier,
   World,
 } from '../domain/types.ts';
 import type { Store } from '../store/store.ts';
@@ -29,6 +32,16 @@ export interface Engine {
     collected: boolean,
   ): Promise<CommandResult>;
   acceptOffer(offerId: OfferId): Promise<CommandResult>;
+  addUrgentJob(input: UrgentJobInput, tier: Tier): Promise<CommandResult & { jobId?: JobId }>;
+}
+
+/** What the Dispatcher's Urgent Job form provides. */
+export interface UrgentJobInput {
+  label: string;
+  pickup: Place;
+  dropoff: Place;
+  parcels: number;
+  deadlineOffsetMin: number;
 }
 
 export interface EngineDeps {
@@ -91,7 +104,11 @@ export function createEngine({ store, clock, voice }: EngineDeps): Engine {
       log(w, `Placement ${next.id} started for ${next.jobId}`);
       return next.id;
     });
-    if (started) await makeOffer(started);
+    if (started) {
+      await makeOffer(started);
+      // A Placement that ended inside makeOffer (Escalated) hands over to the next by Priority.
+      await startNext();
+    }
   }
 
   /** Evaluates the running Placement and offers its Job to the top Eligible Driver. */
@@ -271,6 +288,50 @@ export function createEngine({ store, clock, voice }: EngineDeps): Engine {
         await startNext();
       }
       return { ok: outcome.ok, message: outcome.message };
+    },
+
+    async addUrgentJob(input, tier) {
+      const jobId = store.update((w) => {
+        const id = `U${String(w.jobs.filter((j) => j.id.startsWith('U')).length + 1)}`;
+        const at = nowIso();
+        w.jobs.push({
+          id,
+          label: input.label,
+          pickup: input.pickup,
+          dropoff: input.dropoff,
+          parcels: input.parcels,
+          deadline: new Date(
+            clock.now().getTime() + input.deadlineOffsetMin * 60_000,
+          ).toISOString(),
+          serviceMinutes: 3,
+          tripMinutes: etaMinutesBetween(input.pickup, input.dropoff),
+          driverId: null,
+          collected: false,
+          status: 'unassigned',
+          note: null,
+          version: 0,
+        });
+        // Urgent Jobs are not in the fixture ETA table: straight line at city speed.
+        for (const d of w.drivers) {
+          (w.etaMinutes[d.id] ??= {})[id] = etaMinutesBetween(d.position, input.pickup);
+        }
+        const placementId = `P${String(w.placements.length + 1)}`;
+        w.placements.push({
+          id: placementId,
+          jobId: id,
+          trigger: 'urgent_job',
+          tier,
+          queuedAt: at,
+          status: 'queued',
+          previousDriverId: null,
+          startedAt: null,
+          endedAt: null,
+        });
+        log(w, `Urgent Job ${id} (${input.label}) added; ${tier} Placement ${placementId} queued`);
+        return id;
+      });
+      await startNext();
+      return { ok: true, message: `Urgent Job ${jobId} queued.`, jobId };
     },
   };
 }

@@ -132,3 +132,45 @@ td {
   color: var(--warn);
   font-weight: 600;
 }
+
+/* Urgent Job form + Placement Queue (#9) */
+.urgent-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  align-items: end;
+}
+
+.urgent-form label {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.urgent-form input,
+.urgent-form select {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  padding: 4px 6px;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.urgent-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--warn);
+}
+
+.urgent-error:empty {
+  display: none;
+}
+
+#placement-queue {
+  list-style: none;
+  padding: 0;
+}

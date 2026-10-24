@@ -211,3 +211,75 @@ source.addEventListener('state', (event) => {
   const snapshot = JSON.parse(String(event.data));
   renderPlacement(/** @type {PlacementSnapshot} */ (snapshot));
 });
+
+// ---- Urgent Job form + Placement Queue (#9): self-contained; posts to /api/jobs. ----
+
+/**
+ * @typedef {{
+ *   jobs: { id: string; label: string; deadline: string }[];
+ *   placements: { id: string; jobId: string; tier: string }[];
+ *   queue: string[];
+ * }} QueueSnapshot
+ */
+
+const urgentForm = /** @type {HTMLFormElement} */ (requireElement('urgent-form'));
+const urgentError = requireElement('urgent-error');
+const queueEl = requireElement('placement-queue');
+
+urgentForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const data = new FormData(urgentForm);
+  const field = (/** @type {string} */ name) => {
+    const value = data.get(name);
+    return typeof value === 'string' ? value.trim() : '';
+  };
+  const body = {
+    label: field('label'),
+    pickup: { name: field('pickup') },
+    dropoff: { name: field('dropoff') },
+    parcels: Number(field('parcels')),
+    deadlineOffsetMin: Number(field('deadlineOffsetMin')),
+    tier: field('tier'),
+  };
+  urgentError.textContent = '';
+  void fetch('/api/jobs', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(async (res) => {
+    if (res.ok) {
+      urgentForm.reset();
+      return;
+    }
+    /** @type {unknown} */
+    const raw = await res.json().catch(() => ({}));
+    const payload = /** @type {{ message?: string }} */ (raw);
+    urgentError.textContent = payload.message ?? `Could not add Urgent Job (${String(res.status)})`;
+  });
+});
+
+/** @param {QueueSnapshot} snapshot */
+function renderQueue(snapshot) {
+  const items = snapshot.queue.map((placementId, i) => {
+    const placement = snapshot.placements.find((p) => p.id === placementId);
+    const job = snapshot.jobs.find((j) => j.id === placement?.jobId);
+    const li = document.createElement('li');
+    li.dataset['placementId'] = placementId;
+    const name = job ? `${job.id} ${job.label}` : placementId;
+    const due = job ? clockTime(job.deadline) : '—';
+    li.textContent = `${String(i + 1)}. ${name} · ${placement?.tier ?? ''} · due ${due}`;
+    return li;
+  });
+  if (items.length === 0) {
+    const li = document.createElement('li');
+    li.textContent = 'Queue empty';
+    items.push(li);
+  }
+  queueEl.replaceChildren(...items);
+}
+
+source.addEventListener('state', (event) => {
+  /** @type {unknown} */
+  const snapshot = JSON.parse(String(event.data));
+  renderQueue(/** @type {QueueSnapshot} */ (snapshot));
+});
