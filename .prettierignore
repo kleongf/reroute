@@ -1,0 +1,8 @@
+pnpm-lock.yaml
+dist/
+artifacts/
+coverage/
+# Planning docs are owned by another agent; do not reformat them.
+AGENTS.md
+GLOSSARY.md
+docs/

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reroute</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/dashboard.css" />
+    <script type="module" src="/dashboard.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>Reroute</h1>
+      <p class="live">
+        Live feed:
+        <span id="sse-status" data-testid="sse-status" data-state="connecting">connecting</span>
+        &middot; heartbeats <span id="sse-heartbeats" data-testid="sse-heartbeats">0</span>
+      </p>
+    </header>
+    <main id="dashboard" data-testid="dashboard" class="grid">
+      <section class="panel map" aria-label="Map">
+        <h2>Map</h2>
+        <div id="map" data-testid="map" class="placeholder">Leaflet map goes here</div>
+      </section>
+      <section class="panel" aria-label="Drivers">
+        <h2>Drivers</h2>
+        <table data-testid="drivers-table">
+          <thead>
+            <tr>
+              <th>Driver</th>
+              <th>Status</th>
+              <th>Capacity</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+      <section class="panel" aria-label="Jobs">
+        <h2>Jobs</h2>
+        <table data-testid="jobs-table">
+          <thead>
+            <tr>
+              <th>Job</th>
+              <th>Assigned</th>
+              <th>Due</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </main>
+  </body>
+</html>
