@@ -158,7 +158,11 @@ describe('Retell tracer CLI', () => {
       webhook_url: `${env.PUBLIC_BASE_URL}/webhooks/retell`,
       webhook_events: agent.webhook_events,
       max_call_duration_ms: 60_000,
-      voicemail_option: { action: { type: 'hangup' } },
+      voicemail_option: null,
+      call_screening_option: {
+        agent_identity: 'Reroute, an AI assistant',
+        call_purpose: 'the phone test requested by your teammate',
+      },
     });
   });
 

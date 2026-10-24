@@ -149,10 +149,11 @@ export function exportRetellCapture(options: ExportOptions): string[] {
     const ended = selected.find((record) => record.event === 'call_ended');
     if (ended?.payload.call['call_status'] !== 'ended')
       throw new Error('The selected call_ended record must report call_status=ended.');
-    const transcript = selected.find((record) => record.event === 'transcript_updated')?.payload
-      .call;
-    const transcriptText = transcript?.['transcript'];
-    const transcriptTurns = transcript?.['transcript_with_tool_calls'];
+    const transcript = selected.find((record) => record.event === 'transcript_updated')?.payload;
+    const transcriptText = transcript?.call['transcript'];
+    // Live streamed updates carry turns beside `call`; completed call objects may nest them.
+    const transcriptTurns =
+      transcript?.['transcript_with_tool_calls'] ?? transcript?.call['transcript_with_tool_calls'];
     if (
       !(typeof transcriptText === 'string' && transcriptText.trim().length > 0) &&
       !(Array.isArray(transcriptTurns) && transcriptTurns.length > 0)

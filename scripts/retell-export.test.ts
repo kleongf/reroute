@@ -95,6 +95,30 @@ describe('Retell exporter (synthetic database)', () => {
     expect(readdirSync(root)).toEqual(['synthetic.db']);
   });
 
+  it('exports streamed transcript turns from the envelope root observed in live callbacks', () => {
+    capture();
+    insert('transcript_updated', {
+      event: 'transcript_updated',
+      event_timestamp: 1792863000000,
+      call: {
+        call_id: 'synthetic-call',
+        call_type: 'phone_call',
+        direction: 'outbound',
+        from_number: '+14155550100',
+        to_number: '+14155550101',
+      },
+      transcript_with_tool_calls: [{ role: 'user', content: 'Synthetic yes.' }],
+    });
+    exportRetellCapture({ database, outDir, callId: 'synthetic-call' });
+    const exported = JSON.parse(
+      readFileSync(join(outDir, 'transcript_updated.json'), 'utf8'),
+    ) as unknown;
+    expect(exported).toMatchObject({
+      event: 'transcript_updated',
+      transcript_with_tool_calls: [{ role: 'user', content: 'Synthetic yes.' }],
+    });
+  });
+
   it('requires an explicit selection when multiple calls are present', () => {
     capture();
     capture('another-synthetic-call');

@@ -7,7 +7,7 @@ const sensitiveKey =
 const phoneKey = /(?:phone|fromnumber|tonumber|transferdestination|callerid)/i;
 const urlKey = /(?:url|uri)$/i;
 const idKey =
-  /^(?:call|agent|llm|conversation|tool_call|tool_call_invocation|account|workspace|session)_id$/;
+  /^(?:(?:call|agent|llm|conversation|tool_call|tool_call_invocation|account|workspace|session)_id|(?:twilio|telnyx)_[a-z_]*(?:sid|id))$/;
 const phonePattern = /\+?\d[\d\s().-]{5,}\d/g;
 const spokenPhonePattern =
   /\b(?:zero|oh|one|two|three|four|five|six|seven|eight|nine)(?:[\s,-]+(?:zero|oh|one|two|three|four|five|six|seven|eight|nine)){6,14}\b/gi;

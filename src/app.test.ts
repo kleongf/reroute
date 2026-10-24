@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { DatabaseSync } from 'node:sqlite';
 import { createHarness, type Harness } from './testing/harness.ts';
@@ -29,7 +30,30 @@ describe('createApp', () => {
     expect(await res.text()).toContain('Reroute');
   });
 
-  // All Retell payloads in these tests are synthetic, not real-call captures.
+  it.each([
+    { file: 'call_started.json', path: '/webhooks/retell', status: 204 },
+    { file: 'transcript_updated.json', path: '/webhooks/retell', status: 204 },
+    { file: 'call_ended.json', path: '/webhooks/retell', status: 204 },
+    { file: 'tool-call.json', path: '/tools/tracer_ping', status: 200 },
+  ])(
+    'accepts the redacted live $file capture without dropping fields',
+    async ({ file, path, status }) => {
+      const body = readFileSync(
+        new URL(`../fixtures/retell/tracer-call/${file}`, import.meta.url),
+        'utf8',
+      );
+      const response = await app.request(path, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body,
+      });
+      expect(response.status).toBe(status);
+      const row = db.prepare('SELECT payload FROM webhook_events').get();
+      expect(JSON.parse(String(row?.['payload'])) as unknown).toEqual(JSON.parse(body) as unknown);
+    },
+  );
+
+  // The inline Retell payloads below are synthetic; the replay test above uses real redacted captures.
   it.each(['/tools/tracer_ping', '/webhooks/retell'])('%s rejects invalid JSON', async (path) => {
     const res = await app.request(path, { method: 'POST', body: '{not json' });
     expect(res.status).toBe(400);

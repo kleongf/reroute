@@ -8,8 +8,9 @@ presented as live captures.
 
 ## External prerequisites
 
-The parent coordinates these live steps. This implementation does not purchase
-numbers, enter card details, run setup against an account, or place a call.
+Coordinate these live steps with the teammate receiving the test call. The CLI
+configures the dedicated Agent only with `--setup` and dials only with `--call`;
+it never purchases numbers or handles card details.
 
 1. Select the intended Retell workspace and create an API key there. Keep it only
    in the ignored `.env`; never paste it into logs or commands.
@@ -23,7 +24,7 @@ numbers, enter card details, run setup against an account, or place a call.
    credit estimate is not an observed balance. Do not assume it covers a number
    purchase. See [number purchase](https://docs.retellai.com/deploy/purchase-number)
    and [workspace billing](https://docs.retellai.com/accounts/billing).
-4. With parent coordination, use Phone Numbers → `+` to purchase one US number
+4. If needed, use Phone Numbers → `+` to purchase one US number
    if none is available. Store it as `RETELL_FROM_NUMBER`. The script never buys
    or binds a phone number. Outbound requests use a one-call Agent override, so
    an existing number's Agent bindings are not changed. See
@@ -31,7 +32,7 @@ numbers, enter card details, run setup against an account, or place a call.
    [Create Phone Call](https://docs.retellai.com/api-references/create-phone-call).
 5. Arrange a short call with a consenting teammate, including consent to the
    transcript capture. Set their US E.164 number privately as `RETELL_TO_NUMBER`.
-   Confirm they are ready immediately before the parent runs `--call`.
+   Confirm they are ready immediately before running `--call`.
 6. Install the repository's Node version (currently Node 26+) and dependencies.
    Keep the backend and public tunnel running against the **same** SQLite file
    that will be exported after the call.
@@ -72,6 +73,18 @@ Or use the installed ngrok CLI:
 ngrok http 3000
 ```
 
+During the live tracer run, Cloudflare quick-tunnel creation timed out repeatedly,
+and a Localtunnel URL did not reach the receiver. An SSH tunnel through Pinggy
+successfully served the backend health check and received Retell callbacks:
+
+```sh
+ssh -T -p 443 -o ServerAliveInterval=30 -R 0:localhost:3000 free.pinggy.io
+```
+
+Use the HTTPS origin it prints as `PUBLIC_BASE_URL`. The free session reports a
+sixty-minute limit, so keep it running and recreate it before another test if it
+expires. This is a temporary demo tunnel, not persistent hosting.
+
 Copy the resulting public HTTPS origin privately to `PUBLIC_BASE_URL`. Restarting
 an ephemeral tunnel changes that origin; rerun `--setup` before calling. Retell
 must be able to reach both `POST /tools/tracer_ping` and
@@ -94,7 +107,7 @@ node --env-file-if-exists=.env scripts/retell-tracer.ts
 # Account mutation: configure the dedicated tracer; no purchase or call.
 node --env-file-if-exists=.env scripts/retell-tracer.ts --setup
 
-# Only the parent runs this after coordinating consent and readiness.
+# Run after coordinating the teammate's consent and readiness.
 # This places ONE REAL OUTBOUND CALL and may incur usage charges.
 node --env-file-if-exists=.env scripts/retell-tracer.ts --call
 ```
@@ -134,11 +147,18 @@ The dedicated Agent receives these settings:
   `call_started`, `transcript_updated`, and `call_ended`. Transcript updates are
   not included in the API's default subscription. See
   [Agent webhook settings](https://docs.retellai.com/api-references/create-agent).
-- A 60-second maximum call length (the documented API minimum), ten seconds of
-  silence before hanging up, and voicemail hangup. The prompt asks for a short
+- A 60-second maximum call length (the documented API minimum), thirty seconds of
+  silence before hanging up, and prompt-directed voicemail hangup. Automatic
+  voicemail detection is disabled for this tracer because it can end screening
+  before a person joins. The prompt asks for a short
   test, a clear yes, one tracer invocation, an acknowledgement, and hangup. A
   refusal, voicemail, silence, or unclear reply does not trigger the function.
   It cannot make an Offer or change any Job, Driver, or Placement.
+  If automated call screening asks for identity or purpose, the Agent identifies
+  itself as an AI assistant for the requested phone test and waits for the person.
+  Screening never counts as consent or a refusal.
+  `call_screening_option` also supplies Retell's built-in identity and purpose
+  instructions; `voicemail_option: null` disables the automatic detector.
 
 Before dialing, `--call` checks that the source is in the workspace inventory and
 that the selected dedicated Agent and its custom function point to the current
@@ -186,29 +206,48 @@ The package alias is `pnpm retell:export --call-id call_ID`. The exporter requir
 all four captured events and fails on incomplete evidence; it does not call
 Retell or manufacture missing events.
 
-## Observations and remaining proof
+## Observed live results
 
-Official API and account documentation was checked on 2026-10-24. The CLI and its
-mocked-fetch tests implement those request shapes. The local `--help` path was
-exercised without reading `.env` or contacting Retell.
+On 2026-10-24, a real outbound call through the workspace's existing managed US
+number reached the recipient after screening. They said "Yes"; Retell invoked
+`tracer_ping`; the backend returned HTTP 200; and the Agent acknowledged success
+before ending the call. The call lasted 33.601 seconds. Retell's tool trace shows
+approximately 429 ms between invocation and successful result.
 
-Live account preflight on 2026-10-24 accepted the API key and returned one Agent and
-one phone number. The documented `filter_criteria.channel` request returned HTTP
-400; the same endpoint with an empty body returned HTTP 200. The CLI therefore
-filters voice Agents locally. The legacy `/list-agents` endpoint explicitly rejected
-deprecated API usage. This inventory check does not establish KYC or call success.
-All 21 focused mocked tests, repository TypeScript checks, and lint for the
-tracer scripts passed in the implementation handoff. These checks establish
-local CLI behavior and privacy handling, not live Retell behavior.
+All four required payloads were received for that same call, redacted, reviewed,
+and saved under [`fixtures/retell/tracer-call`](../fixtures/retell/tracer-call/).
+The [capture note](../fixtures/retell/tracer-call/capture-note.md) and provenance
+record the observations. HTTP tests replay the four actual redacted payloads.
 
-**Unverified in this implementation handoff:** account/API-key access, KYC,
-payment method and credits, purchased number, live Agent configuration, tunnel
-reachability, actual outbound connection, audible acknowledgement, webhook
-delivery, and real redacted captures. No real-call evidence has been fabricated.
-The parent must run the live sequence, export the four samples, record the actual
-observations here, and run `pnpm verify` before calling issue #3 complete.
+Surprises that affected the integration:
 
-Mocked checks, after dependencies are installed:
+- The documented `filter_criteria.channel` request returned HTTP 400. An empty
+  body returned HTTP 200, so the CLI filters voice Agents locally. The legacy
+  `/list-agents` endpoint explicitly rejected deprecated API usage.
+- Streamed `transcript_updated` payloads place `transcript_with_tool_calls` at
+  the envelope root, beside `call`. Completed call objects include transcript
+  fields inside `call`. The exporter supports both observed layouts.
+- Call screening was mistaken for voicemail by automatic detection, including
+  a 2.947-second hangup. The tracer disables that detector, supplies the explicit
+  screening options, and requires a clear human yes before invoking the tool.
+- A disconnected SSH tunnel caused `ENOTFOUND` during an earlier tool request.
+  Reconnecting, updating the Agent's URLs, and checking the public endpoint
+  resolved it. The successful capture uses the replacement tunnel.
+- Seven cumulative transcript updates arrived during the successful call. No
+  duplicate required lifecycle/tool deliveries were observed; retry behavior is
+  documented by Retell but was not experimentally forced in this run.
+
+API-key access, a dedicated configured Agent, an existing source number, outbound
+calling, public callbacks, successful tool execution, and the recorded spoken
+acknowledgement were verified. KYC and billing dashboard settings were not
+inspected; the existing workspace already supported the real outbound call.
+Webhook signature verification and fleet voice integration remain outside this
+capture-only tracer ticket.
+
+Local verification:
+
+The final integrated branch passed `pnpm verify`: 93 unit tests, five browser
+tests, formatting, TypeScript checks, lint, build, server boot, and clean shutdown.
 
 ```sh
 pnpm exec vitest run scripts/retell-tracer.test.ts

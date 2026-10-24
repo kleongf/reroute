@@ -1,0 +1,42 @@
+{
+  "format_version": 1,
+  "source": "local webhook_events rows; source=retell",
+  "call": {
+    "call_id": "[call_1]"
+  },
+  "observed_call_type": "phone_call",
+  "observed_direction": "outbound",
+  "authenticity": "Database contents are not independent proof of Retell origin, teammate consent, KYC, billing, or number ownership. Confirm those separately before describing this as a real-call capture.",
+  "selection": "One call; latest received transcript; identical lifecycle/tool retries collapsed.",
+  "redaction": "Export-scoped deterministic aliases; credentials, phone strings, URLs and emails removed. Review remaining text for personal information before committing.",
+  "records": [
+    {
+      "file": "call_started.json",
+      "event": "call_started",
+      "database_row_id": 20,
+      "received_at": "2026-10-24T23:34:21.750Z",
+      "matching_deliveries": 1
+    },
+    {
+      "file": "transcript_updated.json",
+      "event": "transcript_updated",
+      "database_row_id": 28,
+      "received_at": "2026-10-24T23:34:54.799Z",
+      "matching_deliveries": 7
+    },
+    {
+      "file": "call_ended.json",
+      "event": "call_ended",
+      "database_row_id": 29,
+      "received_at": "2026-10-24T23:34:56.106Z",
+      "matching_deliveries": 1
+    },
+    {
+      "file": "tool-call.json",
+      "event": "tool_call:tracer_ping",
+      "database_row_id": 26,
+      "received_at": "2026-10-24T23:34:50.311Z",
+      "matching_deliveries": 1
+    }
+  ]
+}

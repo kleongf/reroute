@@ -1,9 +1,10 @@
 # Retell payload captures
 
-No live-call samples have been captured or committed by this implementation. Inline test
-data is synthetic and is not evidence of an outbound call.
+[`tracer-call/`](tracer-call/) contains reviewed, redacted payloads captured during a real
+outbound phone call on 2026-10-24. Its [capture note](tracer-call/capture-note.md) records the
+observed outcome. Inline unit-test data remains synthetic and is separate from these samples.
 
-After the parent coordinates a consenting teammate's outbound tracer call, export its
+After coordinating a consenting teammate's outbound tracer call, export its
 persisted records from the ignored SQLite database:
 
 ```sh

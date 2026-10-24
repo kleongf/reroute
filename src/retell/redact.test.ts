@@ -3,6 +3,17 @@ import { createRetellRedactor, redactRetellPayload } from './redact.ts';
 
 // All values in these tests are synthetic. They are never live-call fixtures.
 describe('Retell redaction (synthetic)', () => {
+  it('aliases carrier call identifiers and embedded copies', () => {
+    const result = JSON.stringify(
+      redactRetellPayload({
+        telephony_identifier: { twilio_call_sid: 'CA-synthetic-private-carrier-call' },
+        note: 'Carrier reference CA-synthetic-private-carrier-call',
+      }),
+    );
+    expect(result).not.toContain('CA-synthetic-private-carrier-call');
+    expect(result).toContain('[twilio_call_sid_1]');
+  });
+
   it('redacts phone strings anywhere, dynamic variables, spoken digits and word fragments', () => {
     const result = redactRetellPayload({
       call: {

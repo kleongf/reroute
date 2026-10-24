@@ -152,6 +152,7 @@ function llmConfig(base: string): JsonObject {
     begin_message:
       'Hi, this is Reroute, an AI voice test arranged with your teammate. May I run the short tracer test?',
     general_prompt: `You are Reroute, running a short test with a consenting teammate.
+If an automated call-screening assistant asks your name or reason for calling, say "Reroute, an AI assistant calling for the phone test requested by your teammate." Then wait for the person to join. Screening is not consent or a refusal, and does not use up the clarification attempt.
 Wait for a clear yes to the tracer test. Then invoke tracer_ping exactly once with message "reroute tracer confirmed".
 After the tool result, briefly say whether the backend acknowledged it, thank the teammate, and end_call.
 If the tool fails, report that the tracer was not confirmed and end_call; do not retry the tool.
@@ -192,8 +193,14 @@ function agentConfig(base: string, llmId: string): JsonObject {
     webhook_events: WEBHOOK_EVENTS,
     webhook_timeout_ms: 10_000,
     max_call_duration_ms: 60_000,
-    end_call_after_silence_ms: 10_000,
-    voicemail_option: { action: { type: 'hangup' } },
+    end_call_after_silence_ms: 30_000,
+    // Automatic voicemail detection can cut off a call-screening assistant before a person joins.
+    // The prompt still ends on actual voicemail and requires explicit human acceptance for the tool.
+    voicemail_option: null,
+    call_screening_option: {
+      agent_identity: 'Reroute, an AI assistant',
+      call_purpose: 'the phone test requested by your teammate',
+    },
   };
 }
 
