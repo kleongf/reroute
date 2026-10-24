@@ -5,6 +5,7 @@ test.describe('Urgent Job form', () => {
     const label = `Urgent e2e ${String(Date.now())}`;
     await page.goto('/');
     await expect(page.getByTestId('sse-status')).toHaveText('connected');
+    await page.getByTestId('urgent-toggle').click();
 
     const form = page.getByTestId('urgent-form');
     await form.getByLabel('Label').fill(label);
@@ -18,6 +19,8 @@ test.describe('Urgent Job form', () => {
     await form.getByRole('button', { name: 'Add Urgent Job' }).click();
     expect((await posted).status()).toBe(201);
 
+    await expect(form).toBeHidden();
+    await page.getByTestId('drawer-toggle').click();
     const row = page.getByTestId('jobs-table').locator('tbody tr', { hasText: label });
     await expect(row).toBeVisible();
     await expect(page.getByTestId('placement-queue')).toBeVisible();
@@ -26,6 +29,7 @@ test.describe('Urgent Job form', () => {
   test('shows the server message for invalid input', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByTestId('sse-status')).toHaveText('connected');
+    await page.getByTestId('urgent-toggle').click();
     // Bypass native validation so the server's zod message is what the Dispatcher sees.
     await page.evaluate("document.getElementById('urgent-form').noValidate = true");
     const posted = page.waitForResponse('/api/jobs');

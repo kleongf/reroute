@@ -1,6 +1,21 @@
 // @ts-check
-// Framework-free dashboard client. Type-checked via public/tsconfig.json (checkJs).
+// Mission control dashboard: the map is the stage; cards float over it. Renders every `state`
+// snapshot from scratch (no client-side merging) and appends `transcript` SSE events.
 import { initMap } from './map.js';
+
+/** @typedef {import('../src/domain/types.ts').StateSnapshot} StateSnapshot */
+/** @typedef {import('../src/domain/types.ts').DisruptionSummary} DisruptionSummary */
+/** @typedef {StateSnapshot['placements'][number]} PlacementView */
+/** @typedef {import('../src/domain/types.ts').Offer} Offer */
+/** @typedef {import('../src/domain/types.ts').Job} Job */
+/**
+ * @typedef {{ callId: string, kind: string, driverId: string | null, role: 'agent' | 'user',
+ *   text: string, at: string, utteranceId?: string }} TranscriptLine
+ */
+
+const DEMO_TIME_ZONE = 'America/Los_Angeles';
+/** How long the "fixed" celebration stays on screen after a Placement is Placed. */
+const CELEBRATE_MS = 6000;
 
 /**
  * @param {string} id
@@ -11,6 +26,52 @@ function requireElement(id) {
   if (!el) throw new Error(`Missing element #${id}`);
   return el;
 }
+
+/**
+ * Tiny element builder. `attrs` keys starting with `data-` become data attributes.
+ * @param {string} tag
+ * @param {Record<string, string | undefined>} [attrs]
+ * @param {(Node | string | null | undefined | false)[]} kids
+ * @returns {HTMLElement}
+ */
+function h(tag, attrs = {}, ...kids) {
+  const el = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs)) {
+    if (value === undefined) continue;
+    if (key === 'class') el.className = value;
+    else el.setAttribute(key, value);
+  }
+  for (const kid of kids) if (kid !== null && kid !== undefined && kid !== false) el.append(kid);
+  return el;
+}
+
+/** @param {string} iso */
+const clockTime = (iso) =>
+  new Date(iso).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: DEMO_TIME_ZONE,
+  });
+
+/** @param {number} seconds */
+const mmss = (seconds) => {
+  const s = Math.max(0, Math.round(seconds));
+  return `${String(Math.floor(s / 60))}:${String(s % 60).padStart(2, '0')}`;
+};
+
+/** @param {number} n */
+const minutes = (n) => `${String(n)} min`;
+
+const STATUS_LABEL = /** @type {Record<string, string>} */ ({
+  assigned: 'Assigned',
+  at_risk: 'At Risk',
+  late: 'Late',
+  unassigned: 'Unassigned',
+  escalated: 'Escalated',
+  done: 'Done',
+});
+
+// ---- Live feed ----
 
 const statusEl = requireElement('sse-status');
 const heartbeatsEl = requireElement('sse-heartbeats');
@@ -37,202 +98,639 @@ window.addEventListener('beforeunload', () => {
   source.close();
 });
 
-/**
- * @typedef {{ id: string, name: string, phone: string | null, simulated: boolean,
- *   capacity: number, availableFrom: string, availableUntil: string }} SnapshotDriver
- * @typedef {{ id: string, label: string, status: string, driverId: string | null,
- *   parcels: number, deadline: string, note: string | null }} SnapshotJob
- * @typedef {{ drivers: SnapshotDriver[], jobs: SnapshotJob[] }} Snapshot
- */
+// ---- Client state: only what the snapshot cannot carry ----
 
-/** @param {string} iso */
-function clockTime(iso) {
-  return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+/** @type {StateSnapshot | null} */
+let latest = null;
+/** Client clock minus server clock, so live timers tick on the server's time. */
+let skewMs = 0;
+/** @type {Map<string, TranscriptLine[]>} callId → lines, in arrival order. */
+const transcripts = new Map();
+/** Placement IDs already seen as Placed; null until the first snapshot after load/reset. */
+let seenPlaced = /** @type {Set<string> | null} */ (null);
+let seenResetAt = '';
+/** @type {Map<string, number>} placementId → client time the celebration ends. */
+const celebrating = new Map();
+
+const serverNow = () => Date.now() - skewMs;
+
+/** @param {StateSnapshot} s */
+function trackCelebrations(s) {
+  if (s.resetAt !== seenResetAt) {
+    seenResetAt = s.resetAt;
+    seenPlaced = null;
+    celebrating.clear();
+    transcripts.clear();
+  }
+  const placed = s.disruptions.filter((d) => d.status === 'placed').map((d) => d.placementId);
+  if (seenPlaced === null) {
+    seenPlaced = new Set(placed);
+    return;
+  }
+  for (const id of placed) {
+    if (seenPlaced.has(id)) continue;
+    seenPlaced.add(id);
+    celebrating.set(id, Date.now() + CELEBRATE_MS);
+    setTimeout(() => {
+      if (latest) render(latest);
+    }, CELEBRATE_MS + 50);
+  }
 }
+
+/** @param {string} placementId */
+const isCelebrating = (placementId) => (celebrating.get(placementId) ?? 0) > Date.now();
+
+// ---- View model ----
+
+/** @param {StateSnapshot} s */
+function model(s) {
+  /** @param {string | null | undefined} id */
+  const driverName = (id) => s.drivers.find((d) => d.id === id)?.name ?? '—';
+  /** @param {string} id */
+  const job = (id) => s.jobs.find((j) => j.id === id);
+  const running = s.placements.find((p) => p.status === 'running') ?? null;
+  const started = s.placements.filter((p) => p.status !== 'queued');
+  const placement = running ?? started.at(-1) ?? null;
+  const pending = running?.offers.find((o) => o.status === 'pending') ?? null;
+  const open = s.disruptions.filter((d) => d.status === 'running' || d.status === 'queued');
+  const ended = s.disruptions
+    .filter((d) => d.endedAt !== null)
+    .sort((a, b) => Date.parse(b.endedAt ?? '') - Date.parse(a.endedAt ?? ''));
+  const atRisk = s.jobs.filter((j) => j.status === 'at_risk');
+  const placementJobIds = new Set(s.disruptions.map((d) => d.jobId));
+  /** Escalated straight away (Pickup already done): no Placement to show. */
+  const handoffs = s.jobs.filter((j) => j.status === 'escalated' && !placementJobIds.has(j.id));
+  /** @param {string} jobId */
+  const forecast = (jobId) => s.forecasts.find((f) => f.jobId === jobId) ?? null;
+  return {
+    s,
+    driverName,
+    job,
+    running,
+    placement,
+    pending,
+    open,
+    ended,
+    atRisk,
+    handoffs,
+    forecast,
+  };
+}
+
+/** @typedef {ReturnType<typeof model>} Model */
+
+/**
+ * "Late by 9 min with Alex" / "On time with Casey, 31 min to spare".
+ * @param {number | null} minutesLate
+ * @param {string} name
+ */
+function deliveryText(minutesLate, name) {
+  if (minutesLate === null) return `with ${name} (no fixture ETA)`;
+  if (minutesLate > 0) return `Late by ${minutes(minutesLate)} with ${name}`;
+  return `On time with ${name}, ${minutes(-minutesLate)} to spare`;
+}
+
+// ---- Top bar: banner, timer, tally ----
+
+const bannerEl = requireElement('banner');
+const timerEl = requireElement('fix-timer');
+const tallyEl = requireElement('tally');
+
+/** @param {Model} m @returns {{ tone: string, text: string, celebrate: boolean }} */
+function banner(m) {
+  const first = m.open[0];
+  if (first) {
+    const offer = m.running?.jobId === first.jobId ? m.pending : null;
+    const doing = offer ? `offering to ${m.driverName(offer.driverId)}` : 'finding a Driver';
+    return { tone: 'late', text: `${first.jobId} Late · ${doing}`, celebrate: false };
+  }
+  const risk = m.atRisk[0];
+  if (risk) {
+    return {
+      tone: 'risk',
+      text: `${risk.id} At Risk · checking with ${m.driverName(risk.driverId)}`,
+      celebrate: false,
+    };
+  }
+  const last = m.ended[0];
+  if (last?.status === 'placed' && last.after) {
+    const name = m.driverName(last.after.driverId);
+    const late = last.after.minutesLate;
+    const how = late !== null && late > 0 ? `late by ${minutes(late)}` : 'on time';
+    return {
+      tone: 'fixed',
+      text: `${last.jobId} fixed · ${name} has it, ${how}`,
+      celebrate: isCelebrating(last.placementId),
+    };
+  }
+  if (last?.status === 'escalated') {
+    return {
+      tone: 'esc',
+      text: `${last.jobId} not fixed · Escalated to Dispatcher`,
+      celebrate: false,
+    };
+  }
+  const handoff = m.handoffs[0];
+  if (handoff) {
+    return {
+      tone: 'esc',
+      text: `${handoff.id} not fixed · needs a physical handoff`,
+      celebrate: false,
+    };
+  }
+  return { tone: 'ok', text: 'All Jobs on track', celebrate: false };
+}
+
+/** The Disruption the timer measures: the open one, else the most recent. */
+function timerDisruption(/** @type {Model} */ m) {
+  return m.open[0] ?? m.s.disruptions.at(-1) ?? null;
+}
+
+function tickTimer() {
+  if (!latest) return;
+  const d = timerDisruption(model(latest));
+  if (!d) {
+    timerEl.textContent = '–:––';
+    timerEl.dataset['state'] = 'idle';
+    return;
+  }
+  const end = d.endedAt ? Date.parse(d.endedAt) : serverNow();
+  timerEl.textContent = mmss((end - Date.parse(d.reportedAt)) / 1000);
+  timerEl.dataset['state'] = d.status;
+}
+setInterval(tickTimer, 1000);
+
+/** @param {Model} m */
+function renderTopBar(m) {
+  const b = banner(m);
+  bannerEl.textContent = b.text;
+  bannerEl.dataset['tone'] = b.tone;
+  bannerEl.classList.toggle('celebrate', b.celebrate);
+  tickTimer();
+
+  const t = m.s.disruptionTally;
+  const avg = t.averageSecondsToFix === null ? '–' : mmss(t.averageSecondsToFix);
+  tallyEl.replaceChildren(
+    'Disruptions fixed: ',
+    h('b', { 'data-testid': 'tally-fixed' }, String(t.fixed)),
+    ' · avg time to fix ',
+    h('b', { 'data-testid': 'tally-avg' }, avg),
+    t.escalated > 0 ? h('span', { class: 'tally-esc' }, ` · ${String(t.escalated)} Escalated`) : '',
+  );
+}
+
+// ---- Disruption cards ----
+
+const disruptionsEl = requireElement('disruption-cards');
+
+/**
+ * @param {Model} m
+ * @param {DisruptionSummary} d
+ */
+function disruptionCard(m, d) {
+  const job = m.job(d.jobId);
+  const who = m.driverName(d.driverId);
+  const before =
+    d.before.minutesLate !== null && d.before.minutesLate > 0
+      ? deliveryText(d.before.minutesLate, who)
+      : `${who} can't complete it`;
+  /** @type {HTMLElement} */
+  let after;
+  let time;
+  let tag;
+  if (d.status === 'placed' && d.after) {
+    tag = 'Fixed';
+    after = h(
+      'div',
+      { class: 'after ok', 'data-testid': 'disruption-after' },
+      deliveryText(d.after.minutesLate, m.driverName(d.after.driverId)),
+    );
+    time = `Fixed in ${mmss(d.secondsToFix ?? 0)}`;
+  } else if (d.status === 'escalated') {
+    tag = 'Not fixed';
+    after = h(
+      'div',
+      { class: 'after bad', 'data-testid': 'disruption-after' },
+      'No Driver accepted · Escalated to Dispatcher',
+    );
+    time = `Escalated after ${mmss((Date.parse(d.endedAt ?? d.reportedAt) - Date.parse(d.reportedAt)) / 1000)}`;
+  } else {
+    tag = 'Late';
+    const offer = m.running?.id === d.placementId ? m.pending : null;
+    after = h(
+      'div',
+      { class: 'after working', 'data-testid': 'disruption-after' },
+      offer ? `Offering to ${m.driverName(offer.driverId)}…` : 'Finding a Driver…',
+    );
+    time = `${mmss((serverNow() - Date.parse(d.reportedAt)) / 1000)} so far`;
+  }
+  return h(
+    'article',
+    {
+      class: `dcard s-${d.status}${isCelebrating(d.placementId) ? ' celebrate' : ''}`,
+      'data-testid': 'disruption-card',
+      'data-status': d.status,
+      'data-job-id': d.jobId,
+    },
+    h(
+      'div',
+      { class: 'dcard-head' },
+      h('span', { class: 'tag' }, tag),
+      h('b', {}, `${d.jobId} ${job?.label ?? ''}`),
+    ),
+    h(
+      'div',
+      { class: 'why', 'data-testid': 'disruption-reason' },
+      `${who}: ${d.reason ? `“${d.reason}”` : 'reported a Disruption'}`,
+    ),
+    h(
+      'div',
+      { class: 'fix' },
+      h('div', { class: 'before', 'data-testid': 'disruption-before' }, before),
+      h('span', { class: 'arrow' }, '→'),
+      after,
+    ),
+    h('div', { class: 'time', 'data-testid': 'disruption-time' }, time),
+  );
+}
+
+/**
+ * At Risk is not yet a Disruption: only the Driver's answer turns it into one.
+ * @param {Model} m
+ * @param {Job} job
+ */
+function atRiskCard(m, job) {
+  const f = m.forecast(job.id);
+  const who = m.driverName(job.driverId);
+  return h(
+    'article',
+    {
+      class: 'dcard s-at_risk',
+      'data-testid': 'disruption-card',
+      'data-status': 'at_risk',
+      'data-job-id': job.id,
+    },
+    h(
+      'div',
+      { class: 'dcard-head' },
+      h('span', { class: 'tag' }, 'At Risk'),
+      h('b', {}, `${job.id} ${job.label}`),
+    ),
+    h('div', { class: 'why', 'data-testid': 'disruption-reason' }, job.note ?? 'traffic check'),
+    h(
+      'div',
+      { class: 'fix' },
+      h(
+        'div',
+        { class: 'before', 'data-testid': 'disruption-before' },
+        f ? deliveryText(f.minutesLate, who) : `with ${who}`,
+      ),
+      h('span', { class: 'arrow' }, '→'),
+      h(
+        'div',
+        { class: 'after working', 'data-testid': 'disruption-after' },
+        `Checking with ${who}…`,
+      ),
+    ),
+    h('div', { class: 'time' }, 'estimate · simulated traffic'),
+  );
+}
+
+/**
+ * @param {Model} m
+ * @param {Job} job
+ */
+function handoffCard(m, job) {
+  return h(
+    'article',
+    {
+      class: 'dcard s-escalated',
+      'data-testid': 'disruption-card',
+      'data-status': 'escalated',
+      'data-job-id': job.id,
+    },
+    h(
+      'div',
+      { class: 'dcard-head' },
+      h('span', { class: 'tag' }, 'Not fixed'),
+      h('b', {}, `${job.id} ${job.label}`),
+    ),
+    h('div', { class: 'why' }, `${m.driverName(job.driverId)}: “${job.note ?? 'Disruption'}”`),
+    h(
+      'div',
+      { class: 'after bad', 'data-testid': 'disruption-after' },
+      'Parcels collected · needs a physical handoff',
+    ),
+  );
+}
+
+/** @param {Model} m */
+function renderDisruptions(m) {
+  const cards = [
+    ...m.atRisk.map((j) => atRiskCard(m, j)),
+    ...[...m.s.disruptions].reverse().map((d) => disruptionCard(m, d)),
+    ...m.handoffs.map((j) => handoffCard(m, j)),
+  ];
+  if (cards.length === 0) {
+    cards.push(h('p', { class: 'muted' }, 'No Disruptions. Every Job is on track.'));
+  }
+  disruptionsEl.replaceChildren(...cards);
+}
+
+// ---- Live call card ----
+
+const callEl = requireElement('call');
+
+/** @param {Model} m */
+function currentCall(m) {
+  if (m.pending && m.running) {
+    const j = m.job(m.running.jobId);
+    return {
+      live: true,
+      title: `Offer to ${m.driverName(m.pending.driverId)}`,
+      sub: `${m.running.jobId} ${j?.label ?? ''}`,
+      driverId: m.pending.driverId,
+      callId: m.pending.callId,
+      simulated: m.pending.simulated,
+    };
+  }
+  const risk = m.atRisk[0];
+  if (risk) {
+    return {
+      live: true,
+      title: `Check call with ${m.driverName(risk.driverId)}`,
+      sub: `${risk.id} At Risk`,
+      driverId: risk.driverId,
+      callId: null,
+      simulated: false,
+    };
+  }
+  const lastId = [...transcripts.keys()].at(-1);
+  const lastLine = lastId ? transcripts.get(lastId)?.[0] : undefined;
+  if (lastId && lastLine) {
+    return {
+      live: false,
+      title: `Last call: ${m.driverName(lastLine.driverId)}`,
+      sub: lastLine.kind.replace('_', ' '),
+      driverId: lastLine.driverId,
+      callId: lastId,
+      simulated: false,
+    };
+  }
+  return null;
+}
+
+/**
+ * Lines for the call: by Retell call ID when known, else the Driver's latest call.
+ * @param {string | null} callId
+ * @param {string | null} driverId
+ */
+function linesFor(callId, driverId) {
+  if (callId && transcripts.has(callId)) return transcripts.get(callId) ?? [];
+  const ids = [...transcripts.keys()].reverse();
+  const id = ids.find((k) => transcripts.get(k)?.[0]?.driverId === driverId);
+  return id ? (transcripts.get(id) ?? []) : [];
+}
+
+/** @param {Model} m */
+function renderCall(m) {
+  const c = currentCall(m);
+  if (!c) {
+    callEl.replaceChildren(h('p', { class: 'muted' }, 'No call in progress'));
+    return;
+  }
+  const lines = c.simulated ? [] : linesFor(c.callId, c.driverId);
+  callEl.replaceChildren(
+    h(
+      'div',
+      { class: 'call-head' },
+      h('span', { class: `dot${c.live ? ' live' : ''}` }),
+      h('b', { 'data-testid': 'call-title' }, c.title),
+      h('span', { class: 'muted' }, c.sub),
+      c.simulated ? h('span', { class: 'chip warn' }, 'simulated Offer') : null,
+    ),
+    h(
+      'div',
+      { class: 'lines', 'data-testid': 'transcript' },
+      ...(c.simulated
+        ? [h('p', { class: 'muted' }, 'No phone call: the simulated Driver replies by script.')]
+        : lines.length === 0
+          ? [h('p', { class: 'muted' }, c.live ? 'Calling…' : 'No transcript')]
+          : lines.map((l) =>
+              h(
+                'p',
+                {},
+                h(
+                  'b',
+                  { class: l.role === 'agent' ? 'who-agent' : 'who-driver' },
+                  l.role === 'agent' ? 'Reroute: ' : `${m.driverName(l.driverId)}: `,
+                ),
+                l.text,
+              ),
+            )),
+    ),
+  );
+  const box = callEl.querySelector('.lines');
+  if (box) box.scrollTop = box.scrollHeight;
+}
+
+source.addEventListener('transcript', (event) => {
+  /** @type {unknown} */
+  const raw = JSON.parse(/** @type {MessageEvent<string>} */ (event).data);
+  const line = /** @type {TranscriptLine} */ (raw);
+  const list = transcripts.get(line.callId) ?? [];
+  // Retell revises a line as speech continues: upsert by utteranceId, else append.
+  const at = line.utteranceId ? list.findIndex((l) => l.utteranceId === line.utteranceId) : -1;
+  if (at >= 0) list[at] = line;
+  else list.push(line);
+  transcripts.set(line.callId, list);
+  if (latest) renderCall(model(latest));
+});
+
+// ---- Placement card ----
+
+const placementEl = requireElement('placement');
+const queueEl = requireElement('placement-queue');
+
+/** @param {Offer | undefined} o */
+function offerBadge(o) {
+  if (!o) return null;
+  const sim = o.simulated ? ' · simulated Offer' : '';
+  if (o.status === 'pending') return h('span', { class: 'badge live' }, `Offer: calling…${sim}`);
+  if (o.status === 'accepted') return h('span', { class: 'badge ok' }, 'Accepted');
+  if (o.status === 'declined') {
+    const why = o.declineReason ? `: “${o.declineReason}”` : '';
+    return h('span', { class: 'badge bad' }, `Declined${why}${sim}`);
+  }
+  return h('span', { class: 'badge bad' }, `Unanswered${sim}`);
+}
+
+/** @param {Model} m */
+function renderPlacement(m) {
+  const p = m.placement;
+  if (!p) {
+    placementEl.replaceChildren(
+      h(
+        'p',
+        { class: 'muted' },
+        m.atRisk.length > 0 ? 'Only a Disruption starts a Placement.' : 'No Placement yet.',
+      ),
+    );
+  } else {
+    const job = m.job(p.jobId);
+    /** @param {string} driverId */
+    const offerFor = (driverId) => p.offers.findLast((o) => o.driverId === driverId);
+    const eligible = h('ol', { class: 'rungs', 'data-testid': 'eligible-list' });
+    (p.evaluation?.eligible ?? []).forEach((e, i) => {
+      const o = offerFor(e.driverId);
+      eligible.append(
+        h(
+          'li',
+          { class: `rung elig ${o?.status ?? ''}` },
+          h('span', { class: 'rank' }, String(i + 1)),
+          h('span', { class: 'name' }, m.driverName(e.driverId)),
+          h('span', { class: 'eta' }, `${minutes(e.etaToPickupMinutes)} to Pickup`),
+          offerBadge(o),
+        ),
+      );
+    });
+    if (eligible.children.length === 0)
+      eligible.append(h('li', { class: 'muted' }, 'No Eligible Driver'));
+    const ineligible = h('ul', { class: 'rungs', 'data-testid': 'ineligible-list' });
+    for (const i of p.evaluation?.ineligible ?? []) {
+      const o = offerFor(i.driverId);
+      ineligible.append(
+        h(
+          'li',
+          { class: `rung inelig${o ? ' offered' : ''}` },
+          h('span', { class: 'rank' }, '✕'),
+          h('span', { class: 'name' }, m.driverName(i.driverId)),
+          o ? offerBadge(o) : h('span', { class: 'reason' }, i.reason.text),
+        ),
+      );
+    }
+    placementEl.replaceChildren(
+      h(
+        'div',
+        { class: 'placement-head' },
+        h('b', {}, `${p.jobId} ${job?.label ?? ''}`),
+        h('span', { class: 'muted' }, p.tier === 'high' ? 'High' : 'Normal'),
+        h(
+          'span',
+          {
+            class: `pill s-${p.status}`,
+            'data-testid': 'placement-status',
+            'data-status': p.status,
+          },
+          p.status === 'placed'
+            ? 'Placed'
+            : p.status === 'escalated'
+              ? 'Escalated'
+              : p.status === 'running'
+                ? 'Running'
+                : 'Queued',
+        ),
+      ),
+      eligible,
+      ineligible,
+    );
+  }
+
+  const items = m.s.queue.map((id, i) => {
+    const queued = m.s.placements.find((x) => x.id === id);
+    const job = queued ? m.job(queued.jobId) : undefined;
+    const name = job ? `${job.id} ${job.label}` : id;
+    const tier = queued?.tier === 'high' ? 'High' : 'Normal';
+    const due = job ? clockTime(job.deadline) : '—';
+    return h('li', { 'data-placement-id': id }, `${String(i + 1)}. ${name} · ${tier} · due ${due}`);
+  });
+  if (items.length === 0) items.push(h('li', { class: 'muted' }, 'Queue empty'));
+  queueEl.replaceChildren(...items);
+}
+
+const placementToggle = requireElement('placement-toggle');
+placementToggle.addEventListener('click', () => {
+  const card = placementToggle.closest('.placement');
+  const collapsed = card?.classList.toggle('collapsed') ?? false;
+  placementToggle.setAttribute('aria-expanded', String(!collapsed));
+});
+
+// ---- Jobs / Drivers drawer ----
 
 /**
  * @param {string} testId
- * @param {string[][]} rows
- * @param {(string | null)[]} [rowClasses]
+ * @param {HTMLElement[]} rows
  */
-function fillTable(testId, rows, rowClasses = []) {
-  const body = document.querySelector(`[data-testid="${testId}"] tbody`);
-  if (!body) return;
-  body.replaceChildren(
-    ...rows.map((cells, i) => {
-      const tr = document.createElement('tr');
-      const cls = rowClasses[i];
-      if (cls) tr.className = cls;
-      for (const text of cells) {
-        const td = document.createElement('td');
-        td.textContent = text;
-        tr.append(td);
-      }
-      return tr;
-    }),
-  );
+function fillTable(testId, rows) {
+  document.querySelector(`[data-testid="${testId}"] tbody`)?.replaceChildren(...rows);
 }
 
-/** @param {Snapshot} snapshot */
-function renderTables(snapshot) {
-  const nameOf = (/** @type {string | null} */ id) =>
-    snapshot.drivers.find((d) => d.id === id)?.name ?? '—';
-  fillTable(
-    'drivers-table',
-    snapshot.drivers.map((d) => [
-      d.name,
-      d.simulated ? 'simulated' : d.phone ? 'real phone' : 'none',
-      String(d.capacity),
-      `${clockTime(d.availableFrom)}–${clockTime(d.availableUntil)}`,
-    ]),
-  );
+/** @param {Model} m */
+function renderTables(m) {
   fillTable(
     'jobs-table',
-    snapshot.jobs.map((j) => [
-      `${j.id} ${j.label}`,
-      j.note ? `${j.status.replace('_', ' ')} (${j.note})` : j.status.replace('_', ' '),
-      nameOf(j.driverId),
-      String(j.parcels),
-      clockTime(j.deadline),
-    ]),
-    snapshot.jobs.map((j) => `status-${j.status}`),
+    m.s.jobs.map((j) =>
+      h(
+        'tr',
+        { class: `status-${j.status}` },
+        h('td', {}, `${j.id} ${j.label}`),
+        h(
+          'td',
+          {},
+          h('span', { class: `pill s-${j.status}` }, STATUS_LABEL[j.status] ?? j.status),
+          j.note ? ` ${j.note}` : '',
+        ),
+        h('td', {}, m.driverName(j.driverId)),
+        h('td', {}, String(j.parcels)),
+        h('td', {}, clockTime(j.deadline)),
+      ),
+    ),
+  );
+  fillTable(
+    'drivers-table',
+    m.s.drivers.map((d) =>
+      h(
+        'tr',
+        {},
+        h('td', {}, d.name),
+        h('td', {}, d.simulated ? 'simulated' : d.phone ? 'real phone' : 'none'),
+        h('td', {}, String(d.capacity)),
+        h('td', {}, `${clockTime(d.availableFrom)}–${clockTime(d.availableUntil)}`),
+      ),
+    ),
   );
 }
 
-/** @type {((snapshot: Snapshot) => void)[]} */
-export const snapshotListeners = [renderTables];
-
-const map = initMap(requireElement('map'));
-snapshotListeners.push((snapshot) => {
-  map.render(
-    /** @type {import('../src/domain/types.ts').StateSnapshot} */ (
-      /** @type {unknown} */ (snapshot)
-    ),
-  );
+const drawer = requireElement('drawer');
+const drawerToggle = requireElement('drawer-toggle');
+drawerToggle.addEventListener('click', () => {
+  const open = drawer.classList.toggle('open');
+  drawerToggle.setAttribute('aria-expanded', String(open));
 });
 
-source.addEventListener('state', (event) => {
-  /** @type {unknown} */
-  const parsed = JSON.parse(/** @type {MessageEvent<string>} */ (event).data);
-  const snapshot = /** @type {Snapshot} */ (parsed);
-  for (const listener of snapshotListeners) listener(snapshot);
-});
+// ---- Dispatcher actions ----
 
 requireElement('reset').addEventListener('click', () => {
   void fetch('/api/reset', { method: 'POST' });
 });
 
-// ---- Placement panel (#4): self-contained; renders the latest Placement from `state`. ----
-
-/**
- * @typedef {{ id: string; driverId: string; status: string; simulated: boolean; declineReason: string | null }} OfferView
- * @typedef {{ driverId: string; etaToPickupMinutes: number }} EligibleView
- * @typedef {{ driverId: string; reason: { kind: string; text: string } }} IneligibleView
- * @typedef {{
- *   id: string; jobId: string; tier: string; status: string;
- *   queuedAt: string; endedAt: string | null; offers: OfferView[];
- *   evaluation: { eligible: EligibleView[]; ineligible: IneligibleView[] } | null;
- * }} PlacementView
- * @typedef {{ now: string; drivers: { id: string; name: string }[]; placements: PlacementView[] }} PlacementSnapshot
- */
-
-const placementEl = requireElement('placement');
-
-/**
- * @param {string} tag
- * @param {string} text
- * @param {Record<string, string>} [data]
- */
-function placementNode(tag, text, data = {}) {
-  const node = document.createElement(tag);
-  node.textContent = text;
-  for (const [key, value] of Object.entries(data)) node.dataset[key] = value;
-  return node;
-}
-
-/** @param {PlacementSnapshot} snapshot */
-function renderPlacement(snapshot) {
-  const el = placementNode;
-  const placement = snapshot.placements.at(-1);
-  if (!placement) {
-    placementEl.replaceChildren(el('p', 'No Placement yet.'));
-    return;
-  }
-  /** @param {string} id */
-  const nameOf = (id) => snapshot.drivers.find((d) => d.id === id)?.name ?? id;
-  const end = placement.endedAt ?? snapshot.now;
-  const seconds = Math.max(
-    0,
-    Math.round((Date.parse(end) - Date.parse(placement.queuedAt)) / 1000),
-  );
-  const elapsed = `${String(Math.floor(seconds / 60))}m ${String(seconds % 60).padStart(2, '0')}s`;
-  const label = placement.endedAt
-    ? `${placement.status} ${elapsed} after Disruption`
-    : `${placement.status}, ${elapsed} so far`;
-
-  const header = el('p', `${placement.jobId} · ${placement.tier} · `);
-  header.append(el('strong', label, { testid: 'placement-status', status: placement.status }));
-
-  const ranked = el('ol', '', { testid: 'eligible-list' });
-  for (const e of placement.evaluation?.eligible ?? []) {
-    ranked.append(
-      el('li', `${nameOf(e.driverId)} · ${String(e.etaToPickupMinutes)} min to Pickup`),
-    );
-  }
-  if (ranked.children.length === 0) ranked.append(el('li', 'No Eligible Driver'));
-
-  const ineligible = el('ul', '', { testid: 'ineligible-list' });
-  for (const i of placement.evaluation?.ineligible ?? []) {
-    ineligible.append(el('li', `${nameOf(i.driverId)}: ${i.reason.text}`));
-  }
-
-  const offers = el('ul', '', { testid: 'offer-list' });
-  for (const o of placement.offers) {
-    const sim = o.simulated ? ' (simulated Offer)' : '';
-    const why = o.declineReason ? ` (“${o.declineReason}”)` : '';
-    offers.append(
-      el('li', `Offer to ${nameOf(o.driverId)}${sim}: ${o.status}${why}`, { status: o.status }),
-    );
-  }
-  if (offers.children.length === 0) offers.append(el('li', 'No Offers yet'));
-
-  placementEl.replaceChildren(
-    header,
-    el('h3', 'Eligible'),
-    ranked,
-    el('h3', 'Ineligible'),
-    ineligible,
-    el('h3', 'Offers'),
-    offers,
-  );
-}
-
-source.addEventListener('state', (event) => {
-  /** @type {unknown} */
-  const snapshot = JSON.parse(String(event.data));
-  renderPlacement(/** @type {PlacementSnapshot} */ (snapshot));
-});
-
-// ---- Traffic (#8): one "Inject traffic" button per fixture traffic event. ----
-
-/**
- * @typedef {{ trafficEvents: { id: string; label: string }[]; activeTraffic: { id: string }[] }} TrafficSnapshot
- */
-
 const trafficButtonsEl = requireElement('traffic-buttons');
 
-/** @param {TrafficSnapshot} snapshot */
-function renderTrafficButtons(snapshot) {
+/** @param {StateSnapshot} s */
+function renderTrafficButtons(s) {
   trafficButtonsEl.replaceChildren(
-    ...snapshot.trafficEvents.map((t) => {
-      const active = snapshot.activeTraffic.some((a) => a.id === t.id);
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.dataset['testid'] = `inject-traffic-${t.id}`;
-      button.textContent = active
-        ? `${t.label} (simulated traffic, active)`
-        : `Inject traffic: ${t.label} (simulated traffic)`;
-      button.disabled = active;
+    // Active traffic is drawn on the map, so its button steps aside for the banner.
+    ...s.trafficEvents.map((t) => {
+      const active = s.activeTraffic.some((a) => a.id === t.id);
+      const button = h(
+        'button',
+        { type: 'button', 'data-testid': `inject-traffic-${t.id}`, title: 'simulated traffic' },
+        `Inject traffic: ${t.label}`,
+      );
+      if (button instanceof HTMLButtonElement) {
+        button.disabled = active;
+        button.hidden = active;
+      }
       button.addEventListener('click', () => {
         void fetch(`/api/traffic/${encodeURIComponent(t.id)}`, { method: 'POST' });
       });
@@ -241,19 +739,14 @@ function renderTrafficButtons(snapshot) {
   );
 }
 
-// ---- Urgent Job form + Placement Queue (#9): self-contained; posts to /api/jobs. ----
-
-/**
- * @typedef {{
- *   jobs: { id: string; label: string; deadline: string }[];
- *   placements: { id: string; jobId: string; tier: string }[];
- *   queue: string[];
- * }} QueueSnapshot
- */
-
 const urgentForm = /** @type {HTMLFormElement} */ (requireElement('urgent-form'));
+const urgentToggle = requireElement('urgent-toggle');
 const urgentError = requireElement('urgent-error');
-const queueEl = requireElement('placement-queue');
+
+urgentToggle.addEventListener('click', () => {
+  urgentForm.hidden = !urgentForm.hidden;
+  urgentToggle.setAttribute('aria-expanded', String(!urgentForm.hidden));
+});
 
 urgentForm.addEventListener('submit', (event) => {
   event.preventDefault();
@@ -278,6 +771,8 @@ urgentForm.addEventListener('submit', (event) => {
   }).then(async (res) => {
     if (res.ok) {
       urgentForm.reset();
+      urgentForm.hidden = true;
+      urgentToggle.setAttribute('aria-expanded', 'false');
       return;
     }
     /** @type {unknown} */
@@ -287,29 +782,49 @@ urgentForm.addEventListener('submit', (event) => {
   });
 });
 
-/** @param {QueueSnapshot} snapshot */
-function renderQueue(snapshot) {
-  const items = snapshot.queue.map((placementId, i) => {
-    const placement = snapshot.placements.find((p) => p.id === placementId);
-    const job = snapshot.jobs.find((j) => j.id === placement?.jobId);
-    const li = document.createElement('li');
-    li.dataset['placementId'] = placementId;
-    const name = job ? `${job.id} ${job.label}` : placementId;
-    const due = job ? clockTime(job.deadline) : '—';
-    li.textContent = `${String(i + 1)}. ${name} · ${placement?.tier ?? ''} · due ${due}`;
-    return li;
-  });
-  if (items.length === 0) {
-    const li = document.createElement('li');
-    li.textContent = 'Queue empty';
-    items.push(li);
-  }
-  queueEl.replaceChildren(...items);
+// ---- Provenance + render loop ----
+
+const provenanceEl = requireElement('provenance');
+
+/** @param {StateSnapshot} s */
+function renderProvenance(s) {
+  const labels = ['simulated positions', 'fixture ETA'];
+  if (s.activeTraffic.length > 0) labels.push('simulated traffic');
+  if (s.placements.some((p) => p.offers.some((o) => o.simulated))) labels.push('simulated Offer');
+  provenanceEl.textContent = labels.join(' · ');
+}
+
+const map = initMap(requireElement('map'), {
+  paddingTopLeft: [400, 90],
+  paddingBottomRight: [380, 50],
+});
+
+/** @param {StateSnapshot} s */
+function render(s) {
+  const m = model(s);
+  renderTopBar(m);
+  renderDisruptions(m);
+  renderCall(m);
+  renderPlacement(m);
+  renderTables(m);
+  renderTrafficButtons(s);
+  renderProvenance(s);
+  map.render(s);
 }
 
 source.addEventListener('state', (event) => {
   /** @type {unknown} */
-  const snapshot = JSON.parse(String(event.data));
-  renderTrafficButtons(/** @type {TrafficSnapshot} */ (snapshot));
-  renderQueue(/** @type {QueueSnapshot} */ (snapshot));
+  const parsed = JSON.parse(/** @type {MessageEvent<string>} */ (event).data);
+  const s = /** @type {StateSnapshot} */ (parsed);
+  latest = s;
+  skewMs = Date.now() - Date.parse(s.now);
+  trackCelebrations(s);
+  render(s);
 });
+
+// Live "so far" times on open Disruption cards.
+setInterval(() => {
+  if (latest?.disruptions.some((d) => d.status === 'running' || d.status === 'queued')) {
+    renderDisruptions(model(latest));
+  }
+}, 1000);

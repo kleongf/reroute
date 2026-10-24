@@ -100,7 +100,11 @@ describe('snapshot: Disruption before → after, tally, forecasts', () => {
     bench('blair', 'casey');
     await h.post('/tools/report_disruption', disruption);
     const s = await h.state();
-    expect(s.disruptions[0]).toMatchObject({ status: 'escalated', after: null, secondsToFix: null });
+    expect(s.disruptions[0]).toMatchObject({
+      status: 'escalated',
+      after: null,
+      secondsToFix: null,
+    });
     expect(s.disruptionTally).toEqual({
       fixed: 0,
       escalated: 1,

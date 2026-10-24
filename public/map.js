@@ -142,7 +142,11 @@ export function initMap(container, options = {}) {
       for (const job of snapshot.jobs) {
         if (job.status === 'done') continue;
         const driver = job.driverId === null ? undefined : driverById.get(job.driverId);
-        const health = TROUBLE.has(job.status) ? 'trouble' : fixedJobIds.has(job.id) ? 'fixed' : 'ok';
+        const health = TROUBLE.has(job.status)
+          ? 'trouble'
+          : fixedJobIds.has(job.id)
+            ? 'fixed'
+            : 'ok';
         if (driver) {
           L.polyline([ll(driver.position), ll(job.pickup)], {
             color: health === 'trouble' ? '#cf222e' : health === 'fixed' ? '#1a7f37' : '#1d3557',
