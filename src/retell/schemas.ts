@@ -1,15 +1,25 @@
 import { z } from 'zod';
 
 /**
- * Minimal envelope for Retell webhook deliveries. Placeholder: confirm field names against
- * the Retell docs before relying on anything beyond `event` and `call.call_id`.
- * Unknown fields are kept (looseObject) so the raw payload can be logged for inspection.
- * TODO: verify the Retell signature header before trusting the body.
+ * Minimal envelopes for tracer capture, per Retell's custom-function and webhook docs.
+ * Unknown fields are kept at every level for actual payload discovery.
+ * These schemas validate shape, not origin: signature verification is still required
+ * before these requests can authorize any Placement or Offer changes.
  */
-export const retellWebhookSchema = z.object({
+const retellCallSchema = z.looseObject({
+  call_id: z.string().min(1),
+});
+
+export const retellWebhookSchema = z.looseObject({
   event: z.string().min(1),
-  call: z.looseObject({
-    call_id: z.string().min(1),
+  call: retellCallSchema,
+});
+
+export const tracerPingSchema = z.looseObject({
+  name: z.literal('tracer_ping'),
+  call: retellCallSchema,
+  args: z.looseObject({
+    message: z.string(),
   }),
 });
 
