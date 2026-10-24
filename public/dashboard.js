@@ -565,6 +565,15 @@ function offerBadge(o) {
   return h('span', { class: 'badge bad' }, `Unanswered${sim}`);
 }
 
+/**
+ * "routed ETA" or "fixture ETA" (fixture table, or straight line for Urgent Jobs).
+ * @param {StateSnapshot} s
+ * @param {string} driverId
+ * @param {string} jobId
+ */
+const etaLabel = (s, driverId, jobId) =>
+  s.etas.source[driverId]?.[jobId] === 'routed' ? 'routed ETA' : 'fixture ETA';
+
 /** @param {Model} m */
 function renderPlacement(m) {
   const p = m.placement;
@@ -589,7 +598,11 @@ function renderPlacement(m) {
           { class: `rung elig ${o?.status ?? ''}` },
           h('span', { class: 'rank' }, String(i + 1)),
           h('span', { class: 'name' }, m.driverName(e.driverId)),
-          h('span', { class: 'eta' }, `${minutes(e.etaToPickupMinutes)} to Pickup`),
+          h(
+            'span',
+            { class: 'eta' },
+            `${minutes(e.etaToPickupMinutes)} to Pickup · ${etaLabel(m.s, e.driverId, p.jobId)}`,
+          ),
           offerBadge(o),
         ),
       );
@@ -788,7 +801,10 @@ const provenanceEl = requireElement('provenance');
 
 /** @param {StateSnapshot} s */
 function renderProvenance(s) {
-  const labels = ['simulated positions', 'fixture ETA'];
+  const sources = new Set(Object.values(s.etas.source).flatMap((row) => Object.values(row)));
+  const labels = ['simulated positions'];
+  if (sources.has('routed')) labels.push('routed ETA');
+  if (sources.has('fixture') || sources.size === 0) labels.push('fixture ETA');
   if (s.activeTraffic.length > 0) labels.push('simulated traffic');
   if (s.placements.some((p) => p.offers.some((o) => o.simulated))) labels.push('simulated Offer');
   provenanceEl.textContent = labels.join(' · ');

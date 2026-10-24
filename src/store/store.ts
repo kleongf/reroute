@@ -5,6 +5,8 @@ import type {
   DeliveryEstimate,
   DisruptionSummary,
   DriverId,
+  EtaSource,
+  EtaSourceTable,
   Job,
   JobForecast,
   StateSnapshot,
@@ -73,6 +75,7 @@ export function toSnapshot(world: World, now: Date): StateSnapshot {
     log: world.log,
     ...deriveDisruptions(world),
     forecasts: forecasts(world, now),
+    etas: { minutes: world.etaMinutes, source: etaSources(world) },
   };
 }
 
@@ -144,4 +147,16 @@ function deriveDisruptions(world: World): Pick<StateSnapshot, 'disruptions' | 'd
           : Math.round(fixedTimes.reduce((a, b) => a + b, 0) / fixedTimes.length),
     },
   };
+}
+
+/** Every ETA table entry's provenance; entries routing never touched are 'fixture'. */
+function etaSources(world: World): EtaSourceTable {
+  const out: EtaSourceTable = {};
+  for (const [driverId, row] of Object.entries(world.etaMinutes)) {
+    const src: Record<string, EtaSource> = (out[driverId] = {});
+    for (const jobId of Object.keys(row)) {
+      src[jobId] = world.etaSource?.[driverId]?.[jobId] ?? 'fixture';
+    }
+  }
+  return out;
 }

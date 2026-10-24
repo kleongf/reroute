@@ -215,5 +215,9 @@
     "escalated": 0,
     "open": 0,
     "averageSecondsToFix": null
+  },
+  "etas": {
+    "minutes": {},
+    "source": {}
   }
 }
