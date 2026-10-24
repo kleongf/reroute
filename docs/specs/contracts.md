@@ -86,7 +86,7 @@ interface Evaluation {
 }
 ```
 
-`evaluate(job, drivers, etaTable, now, context)` is pure: `context` carries Drivers with pending Offers and Drivers already offered this Placement. Ranking: ETA to Pickup ascending, then Driver ID.
+`evaluate(job, drivers, etaTable, now, context)` is pure: `context` carries Drivers with pending Offers (`pendingOfferDriverIds`), Drivers already offered this Placement (`alreadyOfferedDriverIds`), and per-Driver minutes added by active traffic (`trafficMinutes`). Ranking: ETA to Pickup ascending, then Driver ID.
 
 ## Fixtures
 

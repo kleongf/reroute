@@ -5,6 +5,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import { createApp } from '../app.ts';
 import { openDatabase } from '../db.ts';
+import { createEngine } from '../placement/engine.ts';
 import { createManualClock, type ManualClock } from '../domain/clock.ts';
 import type { StateSnapshot } from '../domain/types.ts';
 import { loadScenario, readScenarioFile, type PhoneBook } from '../store/scenario.ts';
@@ -47,6 +48,12 @@ export function createHarness(phones: PhoneBook = HARNESS_PHONES): Harness {
   const store = createStore(db, loadScenario(scenario, clock.now(), phones));
   const publicDir = mkdtempSync(join(tmpdir(), 'reroute-public-'));
   writeFileSync(join(publicDir, 'index.html'), '<h1>Reroute</h1>');
+  const engine = createEngine({
+    store,
+    clock,
+    voice,
+    dispatcherPhone: phones['DISPATCHER_PHONE'] ?? null,
+  });
   const app = createApp({
     db,
     clock,
@@ -56,6 +63,7 @@ export function createHarness(phones: PhoneBook = HARNESS_PHONES): Harness {
     scenario,
     phones,
     voice,
+    engine,
   });
 
   return {
