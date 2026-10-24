@@ -40,3 +40,20 @@ test.describe('dashboard smoke', () => {
     expect(contentType).toContain('text/event-stream');
   });
 });
+
+test.describe('scenario', () => {
+  test('renders the demo scenario and resets it', async ({ page, request }) => {
+    await page.goto('/');
+    const drivers = page.getByTestId('drivers-table').locator('tbody tr');
+    await expect(drivers).toHaveCount(6);
+    const j17 = page.getByTestId('jobs-table').locator('tbody tr', { hasText: 'J17' });
+    await expect(j17).toContainText('Alex');
+    await expect(page.getByText('simulated positions')).toBeVisible();
+
+    const reset = page.waitForResponse('/api/reset');
+    await page.getByTestId('reset').click();
+    expect((await reset).ok()).toBe(true);
+    await expect(drivers).toHaveCount(6);
+    expect((await request.get('/api/state')).ok()).toBe(true);
+  });
+});

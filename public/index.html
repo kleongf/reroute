@@ -16,6 +16,8 @@
         <span id="sse-status" data-testid="sse-status" data-state="connecting">connecting</span>
         &middot; heartbeats <span id="sse-heartbeats" data-testid="sse-heartbeats">0</span>
       </p>
+      <p class="provenance">simulated positions &middot; fixture ETA</p>
+      <button id="reset" data-testid="reset" type="button">Reset demo</button>
     </header>
     <main id="dashboard" data-testid="dashboard" class="grid">
       <section class="panel map" aria-label="Map">
@@ -28,8 +30,9 @@
           <thead>
             <tr>
               <th>Driver</th>
-              <th>Status</th>
-              <th>Capacity</th>
+              <th>Phone</th>
+              <th>Free slots</th>
+              <th>Available</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -41,7 +44,9 @@
           <thead>
             <tr>
               <th>Job</th>
-              <th>Assigned</th>
+              <th>Status</th>
+              <th>Driver</th>
+              <th>Parcels</th>
               <th>Due</th>
             </tr>
           </thead>

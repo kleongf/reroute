@@ -107,3 +107,28 @@ th {
   border-bottom: 1px solid var(--line);
   padding: 6px 4px;
 }
+
+.provenance {
+  margin: 0;
+  color: var(--warn);
+  font-size: 13px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.status-late,
+.status-at_risk,
+.status-escalated {
+  color: var(--warn);
+  font-weight: 600;
+}
