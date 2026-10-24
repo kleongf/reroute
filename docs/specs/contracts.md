@@ -12,7 +12,7 @@ The seams between tickets. Each ticket owns one side of a seam; change a contrac
 | `src/store/` | SQLite schema, repository, transactions, fixture load/reset | types |
 | `src/placement/engine.ts` | Placement lifecycle; the only writer of Offers, Placements, assignments | store, eligibility, priority, `VoicePort` |
 | `src/voice/port.ts` | `VoicePort` interface + `FakeVoice` for tests | types |
-| `src/routing/` | `RoutingPort` + `FakeRouting`, OSRM implementation, `attachRoutedEtas()` background ETA refresh | types, store |
+| `src/routing/` | `RoutingPort` + `FakeRouting`, OSRM and TomTom implementations, `attachRoutedEtas()` background ETA refresh | types, store |
 | `src/retell/` | `RetellVoice implements VoicePort`, tool + event webhooks | engine, store |
 | `src/events/` | In-process bus; `/events` SSE emits `state` and `transcript` | store |
 | `public/` | Dashboard: renders `state` snapshots, posts to `/api/*` | HTTP only |
@@ -145,10 +145,13 @@ All are idempotent: re-sending one whose effect already happened returns the cur
 interface RoutingPort {
   minutes(from: LatLng, to: LatLng): Promise<number>;             // rejects on error / timeout
   table?(sources: LatLng[], destinations: LatLng[]): Promise<(number | null)[][]>;  // batch form
+  readonly source?: 'routed' | 'traffic';  // provenance written for its answers; default 'routed'
 }
 ```
 
 `ROUTING=osrm` (default `off`) makes the server call `attachRoutedEtas(store, osrm)`: it watches the store, and whenever a Driver × Job pair appears that has not been routed since the last reset (a reset, an Urgent Job), it asks the public OSRM demo server (`router.project-osrm.org`, driving, one `table` request, timeout `ROUTING_TIMEOUT_MS`, default 1500) in the background and writes the answers (whole minutes, rounded up) into the ETA table. Commands and tool calls never wait for it: their responses carry the fixture / straight-line ETAs until the routed ones land. Any error or timeout keeps the fixture value. Answers that arrive after a newer reset are dropped. Traffic minutes still add on top.
+
+`ROUTING=tomtom` (needs `TOMTOM_API_KEY`) does the same with TomTom Matrix Routing v2 (`POST https://api.tomtom.com/routing/matrix/2`, synchronous, `departAt: "now"`, `traffic: "live"`, car, fastest): one request per batch of new pairs (6 Drivers x 3 Jobs = 18 billed transactions per reset), timeout 2 s unless `ROUTING_TIMEOUT_MS` is set, and its answers carry source `'traffic'`. Each pair is requested once per reset, never polled. The simulated traffic events (e.g. "I-280 closed") still add their minutes on top of these live-traffic ETAs.
 
 ## HTTP
 
@@ -170,7 +173,7 @@ Status fields, shared by `report_status` and `decline_offer`: `capacity?` (int �
 - `state`: the full snapshot, sent on connect and after every engine command. The dashboard re-renders from it; no client-side state merging.
   `{ now, resetAt, drivers: Driver[], jobs: Job[], placements: (Placement & { offers: Offer[]; evaluation: Evaluation | null })[], queue: PlacementId[], activeTraffic: TrafficEvent[], trafficEvents: { id, label }[], log: { at, text }[], etas, forecasts, disruptions, disruptionTally }`
 
-  `etas: { minutes: EtaTable; source: Record<DriverId, Record<JobId, 'routed' | 'fixture'>> }`: base ETA to Pickup (before traffic) per Driver per Job, and its provenance. The dashboard labels `'routed'` as "routed ETA" and `'fixture'` as "fixture ETA" (fixture table, or straight line for Urgent Jobs).
+  `etas: { minutes: EtaTable; source: Record<DriverId, Record<JobId, 'routed' | 'traffic' | 'fixture'>> }`: base ETA to Pickup (before simulated traffic) per Driver per Job, and its provenance. The dashboard labels `'traffic'` as "live traffic ETA" (routing service with live traffic, departing now), `'routed'` as "routed ETA" and `'fixture'` as "fixture ETA" (fixture table, or straight line for Urgent Jobs).
 
   Derived in `toSnapshot` (`src/store/store.ts`), never stored. An *estimate* is the ETA table's minutes to Pickup (routed or fixture) + active traffic for that Driver + `serviceMinutes` + `tripMinutes`, from a start time; `minutesLate` = arrival − deadline, rounded (negative = minutes to spare). Traffic is what is active now.
 

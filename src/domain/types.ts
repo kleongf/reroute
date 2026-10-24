@@ -111,8 +111,11 @@ export interface TrafficEvent {
 /** Minutes from each Driver's position to each Job's Pickup. */
 export type EtaTable = Record<DriverId, Record<JobId, number>>;
 
-/** Where an ETA came from: a routing service, or the fixture table / straight-line estimate. */
-export type EtaSource = 'routed' | 'fixture';
+/**
+ * Where an ETA came from: a routing service ('routed'), a live-traffic routing service
+ * ('traffic'), or the fixture table / straight-line estimate ('fixture').
+ */
+export type EtaSource = 'routed' | 'traffic' | 'fixture';
 
 /** Provenance of each ETA table entry; a missing entry means 'fixture'. */
 export type EtaSourceTable = Record<DriverId, Record<JobId, EtaSource>>;

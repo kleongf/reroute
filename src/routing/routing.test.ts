@@ -4,6 +4,7 @@ import { createHarness, type Harness } from '../testing/harness.ts';
 import { createOsrmRouting } from './osrm.ts';
 import { createFakeRouting } from './port.ts';
 import { attachRoutedEtas } from './refresh.ts';
+import { createTomTomRouting } from './tomtom.ts';
 
 const urgent = {
   label: 'Hospital samples',
@@ -146,5 +147,102 @@ describe('OSRM routing', () => {
     await expect(
       createOsrmRouting({ fetch: () => json({ code: 'NoRoute' }) }).minutes(a, a),
     ).rejects.toThrow('NoRoute');
+  });
+});
+
+describe('TomTom routing', () => {
+  // Shape recorded from the Matrix Routing v2 synchronous docs: one cell ok, one cell failed.
+  const recorded = {
+    data: [
+      {
+        originIndex: 0,
+        destinationIndex: 0,
+        routeSummary: {
+          lengthInMeters: 3120,
+          travelTimeInSeconds: 541,
+          trafficDelayInSeconds: 60,
+          departureTime: '2026-10-24T14:00:00-07:00',
+          arrivalTime: '2026-10-24T14:09:01-07:00',
+        },
+      },
+      {
+        originIndex: 0,
+        destinationIndex: 1,
+        detailedError: { code: 'CELL_PROCESSING_ERROR', message: 'Cell could not be processed' },
+      },
+    ],
+    statistics: { totalCount: 2, successes: 1, failures: 1 },
+  };
+  const a = { lat: 37.76, lng: -122.41 };
+  const b = { lat: 37.78, lng: -122.42 };
+
+  it('posts one live-traffic matrix request and parses whole minutes', async () => {
+    const requests: { url: string; body: unknown }[] = [];
+    const tomtom = createTomTomRouting({
+      apiKey: 'test-key',
+      fetch: (url, init) => {
+        requests.push({ url: url as string, body: JSON.parse(init?.body as string) });
+        return Promise.resolve(new Response(JSON.stringify(recorded)));
+      },
+    });
+    expect(tomtom.source).toBe('traffic');
+    expect(await tomtom.table?.([a], [b, a])).toEqual([[10, null]]);
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.url).toBe('https://api.tomtom.com/routing/matrix/2?key=test-key');
+    expect(requests[0]?.body).toMatchObject({
+      origins: [{ point: { latitude: 37.76, longitude: -122.41 } }],
+      destinations: [{ point: { latitude: 37.78, longitude: -122.42 } }, {}],
+      options: { departAt: 'now', traffic: 'live' },
+    });
+  });
+
+  it('rejects on HTTP errors such as quota exceeded', async () => {
+    const tomtom = createTomTomRouting({
+      apiKey: 'k',
+      fetch: () => Promise.resolve(new Response('{}', { status: 429 })),
+    });
+    await expect(tomtom.minutes(a, b)).rejects.toThrow('429');
+  });
+
+  it('labels refreshed ETAs as traffic and keeps fixture ETAs on failure', async () => {
+    const h = createHarness();
+    try {
+      let fail = false;
+      const r = attachRoutedEtas(
+        h.store,
+        createTomTomRouting({
+          apiKey: 'k',
+          fetch: (_url, init) => {
+            if (fail) return Promise.reject(new Error('timeout'));
+            const body = JSON.parse(init?.body as string) as {
+              origins: unknown[];
+              destinations: unknown[];
+            };
+            const data = body.origins.flatMap((_o, i) =>
+              body.destinations.map((_d, j) => ({
+                originIndex: i,
+                destinationIndex: j,
+                routeSummary: { travelTimeInSeconds: 300 },
+              })),
+            );
+            return Promise.resolve(new Response(JSON.stringify({ data })));
+          },
+        }),
+      );
+      await r.settled();
+      let s = await h.state();
+      expect(s.etas.minutes['alex']?.['J17']).toBe(5);
+      expect(s.etas.source['alex']?.['J17']).toBe('traffic');
+
+      fail = true;
+      h.clock.advance(60_000);
+      await h.post('/api/reset');
+      await r.settled();
+      s = await h.state();
+      expect(s.etas.minutes['alex']?.['J17']).toBe(10);
+      expect(s.etas.source['alex']?.['J17']).toBe('fixture');
+    } finally {
+      h.close();
+    }
   });
 });
