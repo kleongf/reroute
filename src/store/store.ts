@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { comparePriority } from '../domain/priority.ts';
-import type { StateSnapshot, World } from '../domain/types.ts';
+import type { EtaSource, EtaSourceTable, StateSnapshot, World } from '../domain/types.ts';
 
 /**
  * Holds the World. Commands run synchronously on Node's single thread, so each `update` is
@@ -62,5 +62,18 @@ export function toSnapshot(world: World, now: Date): StateSnapshot {
     activeTraffic: world.trafficEvents.filter((t) => world.activeTrafficIds.includes(t.id)),
     trafficEvents: world.trafficEvents.map((t) => ({ id: t.id, label: t.label })),
     log: world.log,
+    etas: { minutes: world.etaMinutes, source: etaSources(world) },
   };
+}
+
+/** Every ETA table entry's provenance; entries routing never touched are 'fixture'. */
+function etaSources(world: World): EtaSourceTable {
+  const out: EtaSourceTable = {};
+  for (const [driverId, row] of Object.entries(world.etaMinutes)) {
+    const src: Record<string, EtaSource> = (out[driverId] = {});
+    for (const jobId of Object.keys(row)) {
+      src[jobId] = world.etaSource?.[driverId]?.[jobId] ?? 'fixture';
+    }
+  }
+  return out;
 }

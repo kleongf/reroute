@@ -109,6 +109,12 @@ export interface TrafficEvent {
 /** Minutes from each Driver's position to each Job's Pickup. */
 export type EtaTable = Record<DriverId, Record<JobId, number>>;
 
+/** Where an ETA came from: a routing service, or the fixture table / straight-line estimate. */
+export type EtaSource = 'routed' | 'fixture';
+
+/** Provenance of each ETA table entry; a missing entry means 'fixture'. */
+export type EtaSourceTable = Record<DriverId, Record<JobId, EtaSource>>;
+
 export interface LogEntry {
   at: string;
   text: string;
@@ -123,6 +129,8 @@ export interface World {
   offers: Offer[];
   evaluations: Record<PlacementId, Evaluation>;
   etaMinutes: EtaTable;
+  /** Set by routed-ETA refresh (#11); absent in fixture-only Worlds. */
+  etaSource?: EtaSourceTable;
   trafficEvents: TrafficEvent[];
   activeTrafficIds: string[];
   log: LogEntry[];
@@ -139,4 +147,6 @@ export interface StateSnapshot {
   activeTraffic: TrafficEvent[];
   trafficEvents: { id: string; label: string }[];
   log: LogEntry[];
+  /** Base ETA to Pickup (before traffic) and its provenance, per Driver per Job. */
+  etas: { minutes: EtaTable; source: EtaSourceTable };
 }
