@@ -1,7 +1,7 @@
 import type { Clock } from '../domain/clock.ts';
 import { evaluate } from '../domain/eligibility.ts';
 import { comparePriority } from '../domain/priority.ts';
-import { spokenTime } from '../domain/time.ts';
+import { addMinutes, spokenTime } from '../domain/time.ts';
 import type {
   Driver,
   DriverId,
@@ -29,6 +29,8 @@ export interface Engine {
     collected: boolean,
   ): Promise<CommandResult>;
   acceptOffer(offerId: OfferId): Promise<CommandResult>;
+  injectTraffic(trafficEventId: string): Promise<CommandResult>;
+  confirmOnTrack(driverId: DriverId, jobId: JobId): Promise<CommandResult>;
 }
 
 export interface EngineDeps {
@@ -271,6 +273,76 @@ export function createEngine({ store, clock, voice }: EngineDeps): Engine {
         await startNext();
       }
       return { ok: outcome.ok, message: outcome.message };
+    },
+
+    async injectTraffic(trafficEventId) {
+      const calls = store.update((w): { to: string; vars: Record<string, string> }[] | null => {
+        const event = w.trafficEvents.find((t) => t.id === trafficEventId);
+        if (!event) return null;
+        if (w.activeTrafficIds.includes(event.id)) return [];
+        w.activeTrafficIds.push(event.id);
+        log(w, `Traffic: ${event.label} (simulated traffic)`);
+        const now = nowIso();
+        const out: { to: string; vars: Record<string, string> }[] = [];
+        for (const job of w.jobs) {
+          const delay = job.driverId ? (event.addedMinutes[job.driverId] ?? 0) : 0;
+          if (!job.driverId || job.collected || delay === 0) continue;
+          if (job.status !== 'assigned' && job.status !== 'at_risk') continue;
+          const driverId = job.driverId;
+          const baseEta = w.etaMinutes[driverId]?.[job.id];
+          if (baseEta === undefined) continue;
+          let traffic = 0;
+          for (const t of w.trafficEvents.filter((e) => w.activeTrafficIds.includes(e.id))) {
+            traffic += t.addedMinutes[driverId] ?? 0;
+          }
+          const arrival = addMinutes(now, baseEta + traffic + job.serviceMinutes + job.tripMinutes);
+          if (arrival <= job.deadline) continue;
+          job.status = 'at_risk';
+          job.note = `${event.label}; arrives ${spokenTime(arrival)}`;
+          job.version += 1;
+          const driver = w.drivers.find((d) => d.id === driverId);
+          log(w, `${job.id} At Risk: ${driver?.name ?? driverId} arrives ${spokenTime(arrival)}`);
+          if (!driver?.phone || driver.simulated) continue;
+          out.push({
+            to: driver.phone,
+            vars: {
+              call_kind: 'at_risk_check',
+              driver_id: driver.id,
+              driver_name: driver.name,
+              ...jobVars(job),
+              reason: event.label,
+              eta_spoken: spokenTime(arrival),
+              delay_minutes: String(delay),
+            },
+          });
+        }
+        return out;
+      });
+      if (!calls) return { ok: false, message: `Unknown traffic event ${trafficEventId}.` };
+      for (const call of calls) await voice.placeCall({ kind: 'at_risk_check', ...call });
+      return { ok: true, message: `${String(calls.length)} check call(s) placed.` };
+    },
+
+    confirmOnTrack(driverId, jobId) {
+      return Promise.resolve(
+        store.update((w): CommandResult => {
+          const job = w.jobs.find((j) => j.id === jobId);
+          if (!job) return { ok: false, message: `I can't find job ${jobId}.` };
+          if (job.driverId !== driverId) {
+            return { ok: false, message: `Job ${jobId} isn't one of your jobs.` };
+          }
+          if (job.status === 'at_risk') {
+            job.status = 'assigned';
+            job.note = 'Driver confirmed';
+            job.version += 1;
+            const name = w.drivers.find((d) => d.id === driverId)?.name ?? driverId;
+            log(w, `${name} confirmed on track for ${job.id}`);
+          } else if (job.status !== 'assigned') {
+            return { ok: false, message: `Job ${jobId} is ${job.status.replace('_', ' ')} now.` };
+          }
+          return { ok: true, message: `Thanks, I've noted you're on track for ${job.label}.` };
+        }),
+      );
     },
   };
 }

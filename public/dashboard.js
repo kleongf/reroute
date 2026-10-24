@@ -211,3 +211,37 @@ source.addEventListener('state', (event) => {
   const snapshot = JSON.parse(String(event.data));
   renderPlacement(/** @type {PlacementSnapshot} */ (snapshot));
 });
+
+// ---- Traffic (#8): one "Inject traffic" button per fixture traffic event. ----
+
+/**
+ * @typedef {{ trafficEvents: { id: string; label: string }[]; activeTraffic: { id: string }[] }} TrafficSnapshot
+ */
+
+const trafficButtonsEl = requireElement('traffic-buttons');
+
+/** @param {TrafficSnapshot} snapshot */
+function renderTrafficButtons(snapshot) {
+  trafficButtonsEl.replaceChildren(
+    ...snapshot.trafficEvents.map((t) => {
+      const active = snapshot.activeTraffic.some((a) => a.id === t.id);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset['testid'] = `inject-traffic-${t.id}`;
+      button.textContent = active
+        ? `${t.label} (simulated traffic, active)`
+        : `Inject traffic: ${t.label} (simulated traffic)`;
+      button.disabled = active;
+      button.addEventListener('click', () => {
+        void fetch(`/api/traffic/${encodeURIComponent(t.id)}`, { method: 'POST' });
+      });
+      return button;
+    }),
+  );
+}
+
+source.addEventListener('state', (event) => {
+  /** @type {unknown} */
+  const snapshot = JSON.parse(String(event.data));
+  renderTrafficButtons(/** @type {TrafficSnapshot} */ (snapshot));
+});

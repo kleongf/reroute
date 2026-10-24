@@ -21,6 +21,11 @@ const reportDisruptionArgs = z.object({
   collected: z.boolean(),
 });
 
+const confirmOnTrackArgs = z.object({
+  driver_id: z.string().min(1).optional(),
+  job_id: z.string().min(1).optional(),
+});
+
 const acceptOfferArgs = z.object({ offer_id: z.string().min(1).optional() });
 
 type ToolCall = z.infer<typeof toolCallSchema>;
@@ -60,6 +65,20 @@ export function registerTools(app: Hono, deps: { engine: Engine; store: Store })
         body.call.retell_llm_dynamic_variables?.['offer_id'];
       if (!offerId) return invalid("Sorry, I can't tell which offer you're accepting.");
       const r = await deps.engine.acceptOffer(offerId);
+      return { status: r.ok ? 200 : 400, result: r.message };
+    },
+
+    async confirm_on_track(body) {
+      const args = confirmOnTrackArgs.safeParse(body.args);
+      const vars = body.call.retell_llm_dynamic_variables;
+      const driverId =
+        (args.success ? args.data.driver_id : undefined) ??
+        vars?.['driver_id'] ??
+        deps.store.get().drivers.find((d) => d.phone && d.phone === body.call.from_number)?.id;
+      if (!driverId) return invalid("Sorry, I don't recognise this phone number.");
+      const jobId = (args.success ? args.data.job_id : undefined) ?? vars?.['job_id'];
+      if (!jobId) return invalid('Sorry, which job are you on track for?');
+      const r = await deps.engine.confirmOnTrack(driverId, jobId);
       return { status: r.ok ? 200 : 400, result: r.message };
     },
   };

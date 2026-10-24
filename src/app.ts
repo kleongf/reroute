@@ -61,6 +61,12 @@ export function createApp(deps: AppDeps): Hono {
     return c.json(toSnapshot(deps.store.get(), deps.clock.now()));
   });
 
+  app.post('/api/traffic/:id', async (c) => {
+    const r = await deps.engine.injectTraffic(c.req.param('id'));
+    if (!r.ok) return c.json({ error: r.message }, 404);
+    return c.json(toSnapshot(deps.store.get(), deps.clock.now()));
+  });
+
   registerTools(app, { engine: deps.engine, store: deps.store });
 
   app.post('/webhooks/retell', async (c) => {

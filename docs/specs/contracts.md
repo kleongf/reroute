@@ -119,7 +119,7 @@ interface VoicePort {
 }
 ```
 
-Vars always include `call_kind`, plus `job_id`, `job_label`, `pickup_name`, `deadline_spoken` ("3:00 PM"), `parcels`, and as relevant `offer_id`, `driver_name`, `reason`. Simulated Drivers never reach `VoicePort`; the engine resolves their Offer itself after a short delay (`SIMULATED_OFFER_MS`, default 4000) using the fixture's scripted reply.
+Vars always include `call_kind`, plus `job_id`, `job_label`, `pickup_name`, `deadline_spoken` ("3:00 PM"), `parcels`, and as relevant `offer_id`, `driver_id`, `driver_name`, `reason`. `at_risk_check` calls also carry `eta_spoken` (estimated arrival with traffic, "3:08 PM") and `delay_minutes`; `reason` is the traffic event label. Simulated Drivers never reach `VoicePort`; the engine resolves their Offer itself after a short delay (`SIMULATED_OFFER_MS`, default 4000) using the fixture's scripted reply.
 
 ## Engine commands
 
@@ -144,7 +144,7 @@ All are idempotent: re-sending one whose effect already happened returns the cur
 | `POST /tools/:name` | Retell custom-function payload `{ name, call, args }` | Responds `{ result: string }` the agent can speak; < 1 s |
 | `POST /webhooks/retell` | Retell call events | `call_ended` → `markUnanswered`; `transcript_updated` → `transcript` SSE |
 | `POST /api/reset` | — | |
-| `POST /api/traffic/:id` | — | |
+| `POST /api/traffic/:id` | — | `injectTraffic`; returns the snapshot; unknown id → 404 |
 | `POST /api/jobs` | `{ label, pickup, dropoff, parcels, deadlineOffsetMin, tier }` | |
 | `GET /events` | — | SSE |
 
