@@ -1,5 +1,6 @@
 // @ts-check
 // Framework-free dashboard client. Type-checked via public/tsconfig.json (checkJs).
+import { initMap } from './map.js';
 
 /**
  * @param {string} id
@@ -100,6 +101,15 @@ function renderTables(snapshot) {
 
 /** @type {((snapshot: Snapshot) => void)[]} */
 export const snapshotListeners = [renderTables];
+
+const map = initMap(requireElement('map'));
+snapshotListeners.push((snapshot) => {
+  map.render(
+    /** @type {import('../src/domain/types.ts').StateSnapshot} */ (
+      /** @type {unknown} */ (snapshot)
+    ),
+  );
+});
 
 source.addEventListener('state', (event) => {
   /** @type {unknown} */

@@ -5,7 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Reroute</title>
     <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="/dashboard.css" />
+    <link rel="stylesheet" href="/map.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script type="module" src="/dashboard.js"></script>
   </head>
   <body>
@@ -22,7 +25,7 @@
     <main id="dashboard" data-testid="dashboard" class="grid">
       <section class="panel map" aria-label="Map">
         <h2>Map</h2>
-        <div id="map" data-testid="map" class="placeholder">Leaflet map goes here</div>
+        <div id="map" data-testid="map"></div>
       </section>
       <section class="panel" aria-label="Drivers">
         <h2>Drivers</h2>
