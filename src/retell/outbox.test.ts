@@ -114,4 +114,37 @@ describe('outbound voice outbox', () => {
     await outbox.flush();
     expect(h.voice.calls).toHaveLength(0);
   });
+  it('hands a failed outbound Offer back to the engine as Unanswered so Placement can progress', async () => {
+    const calls: CallRequest[] = [];
+    const engine = createEngine({
+      store: h.store,
+      clock: h.clock,
+      dispatcherPhone: null,
+      voice: {
+        placeCall(call) {
+          if (!outbox) throw new Error('Missing outbox');
+          return outbox.placeCall(call);
+        },
+      },
+    });
+    outbox = createVoiceOutbox({
+      db: h.db,
+      store: h.store,
+      clock: h.clock,
+      onUnanswered: (offerId) => engine.markUnanswered(offerId),
+      transport: {
+        placeCall(call) {
+          calls.push(call);
+          return Promise.reject(new Error('provider unavailable'));
+        },
+      },
+    });
+    await engine.reportDisruption('alex', 'J17', 'flat tire', false);
+    for (let attempt = 0; attempt < 3; attempt++) await outbox.flush();
+    const state = await h.state();
+    expect(calls).toHaveLength(3);
+    expect(state.placements[0]?.status).toBe('escalated');
+    expect(state.placements[0]?.offers[0]?.status).toBe('unanswered');
+    expect(state.jobs.find((job) => job.id === 'J17')?.driverId).toBe('alex');
+  });
 });
