@@ -156,3 +156,19 @@ Tool names: `get_my_jobs`, `report_disruption`, `confirm_on_track`, `report_stat
   `{ now, drivers: Driver[], jobs: Job[], placements: (Placement & { offers: Offer[]; evaluation: Evaluation | null })[], queue: PlacementId[], activeTraffic: TrafficEvent[], log: { at, text }[] }`
 - `transcript`: `{ callId, kind: CallKind | 'inbound', driverId, role: 'agent' | 'user', text, at }`.
 - `heartbeat`: unchanged.
+
+## Retell transport integration (#6)
+
+The running server uses `VOICE_MODE=fake` by default. `VOICE_MODE=retell` requires
+Retell agent IDs/source number and verifies raw-body signatures on `/tools/*` and
+`/webhooks/retell`. Tests inject fake transports and clocks; no real calls.
+Outbound `VoicePort` calls are persisted to an outbox before returning a local call
+ID. Delivery occurs in the background, preserving sub-second tool responses. The
+adapter adds `reroute_call_id` and `demo_reset_at` string dynamic variables; these
+must survive in Retell's `call.retell_llm_dynamic_variables` alongside the existing
+Driver, Job, and Offer IDs. Old-reset callbacks cannot resolve a new Offer.
+The events adapter calls `engine.markUnanswered(offerId)` for a current pending
+Offer on `call_ended` (the #5 engine implements that method). Transcript SSE keeps
+the existing `{callId,kind,driverId,role,text,at}` shape and adds `utteranceId` so a
+client can replace a revised utterance rather than append duplicates. The partner's
+UI prototype owns rendering these events; this branch does not change its markup.
