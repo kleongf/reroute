@@ -24,6 +24,8 @@
     "test:e2e": "playwright test",
     "verify": "tsx scripts/verify.ts",
     "ui:explore": "tsx scripts/explore.ts",
+    "retell:tracer": "node --env-file-if-exists=.env scripts/retell-tracer.ts",
+    "retell:export": "node --env-file-if-exists=.env scripts/retell-export.ts",
     "prepare": "husky"
   },
   "lint-staged": {
