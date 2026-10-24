@@ -3,6 +3,7 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { Clock } from './domain/clock.ts';
+import { registerNextApp } from './next-app.ts';
 import type { Engine } from './placement/engine.ts';
 import { createTranscriptBus } from './events/transcripts.ts';
 import { retellAuthentication } from './retell/auth.ts';
@@ -10,7 +11,7 @@ import { retellCallContext } from './retell/context.ts';
 import { handleRetellEvent, type CallEventEngine } from './retell/events.ts';
 import { retellIdempotency } from './retell/idempotency.ts';
 import { registerUrgentJobs } from './placement/urgent-route.ts';
-import { retellWebhookSchema } from './retell/schemas.ts';
+import { retellWebhookSchema, tracerPingSchema } from './retell/schemas.ts';
 import { registerTools } from './retell/tools.ts';
 import { loadScenario, type PhoneBook, type Scenario } from './store/scenario.ts';
 import { toSnapshot, type Store } from './store/store.ts';
@@ -22,6 +23,8 @@ export interface AppDeps {
   readonly heartbeatMs: number;
   /** Directory holding the dashboard's static files. */
   readonly publicDir: string;
+  /** Directory holding the web/ build served at /next; omitted = no /next. */
+  readonly webDir?: string;
   readonly store: Store;
   readonly scenario: Scenario;
   readonly phones: PhoneBook;
@@ -84,6 +87,26 @@ export function createApp(deps: AppDeps): Hono {
     return c.json(toSnapshot(deps.store.get(), deps.clock.now()));
   });
 
+  // Capture only: this route does not authenticate Retell or authorize domain changes.
+  app.post('/tools/tracer_ping', async (c) => {
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid_json' }, 400);
+    }
+    const parsed = tracerPingSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ error: 'invalid_body', issues: parsed.error.issues }, 400);
+    }
+    deps.db
+      .prepare(
+        'INSERT INTO webhook_events (received_at, source, event, payload) VALUES (?, ?, ?, ?)',
+      )
+      .run(deps.clock.now().toISOString(), 'retell', 'tool_call:tracer_ping', JSON.stringify(body));
+    return c.json({ result: 'Tracer received. The backend connection is working.' });
+  });
+
   app.post('/api/traffic/:id', async (c) => {
     const r = await deps.engine.injectTraffic(c.req.param('id'));
     if (!r.ok) return c.json({ error: r.message }, 404);
@@ -118,6 +141,7 @@ export function createApp(deps: AppDeps): Hono {
     return c.body(null, 204);
   });
 
+  if (deps.webDir !== undefined) registerNextApp(app, deps.webDir);
   app.use('/*', serveStatic({ root: deps.publicDir }));
 
   return app;

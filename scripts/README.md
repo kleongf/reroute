@@ -3,13 +3,20 @@
 ## `pnpm verify`
 
 The single gate. Runs, failing fast: `format:check` → `typecheck` → `lint` → `test` (Vitest) →
-`build` → boot `dist/server.js` on a free port with a temp SQLite DB → Playwright e2e
+`build` (server + `web/` Vite app into `dist/web`) → boot `dist/server.js` on a free port with a temp SQLite DB → Playwright e2e
 (`e2e/`) against it → clean shutdown (must exit 0). Prints a PASS/FAIL table; exit code 0 only
 if everything passed.
 
 Outputs (gitignored): `artifacts/screenshots/dashboard.png`, `artifacts/verify/server.log`,
 `artifacts/verify/summary.json`, Playwright traces/screenshots on failure under
 `artifacts/playwright/`.
+
+## `pnpm dev`
+
+Runs the backend (`tsx watch`, port 3000) and the `web/` Vite dev server together. Open
+http://localhost:5173/next/ for the React dashboard with hot reload; Vite proxies `/api`,
+`/events`, `/tools`, `/webhooks`, `/health` to the backend (`BACKEND_URL` overrides). The
+built app is served by Hono at `/next`; `/` is still the `public/` dashboard.
 
 ## `pnpm ui:explore`
 

@@ -1,0 +1,434 @@
+{
+  "call": {
+    "call_id": "[call_1]",
+    "call_type": "phone_call",
+    "agent_id": "[agent_1]",
+    "agent_version": 0,
+    "agent_name": "Reroute tracer (issue 3)",
+    "retell_llm_dynamic_variables": {
+      "call_kind": "tracer",
+      "job_id": "tracer-job",
+      "driver_id": "tracer-driver",
+      "offer_id": "tracer-offer"
+    },
+    "contact_dynamic_variables": {},
+    "custom_sip_headers": {},
+    "call_status": "ongoing",
+    "start_timestamp": 1792884861244,
+    "disconnection_reason": "agent_hangup",
+    "latency": {},
+    "metadata": {
+      "purpose": "reroute-tracer"
+    },
+    "call_cost": {
+      "product_costs": [],
+      "total_duration_seconds": 0,
+      "total_duration_unit_price": 0,
+      "combined_cost": 0
+    },
+    "data_storage_setting": "everything",
+    "opt_in_signed_url": false,
+    "from_number": "[phone_1]",
+    "to_number": "[phone_2]",
+    "direction": "outbound",
+    "telephony_identifier": {
+      "twilio_call_sid": "[twilio_call_sid_1]"
+    }
+  },
+  "event": "transcript_updated",
+  "transcript_with_tool_calls": [
+    {
+      "role": "agent",
+      "content": "Hi, ",
+      "words": [
+        {
+          "word": "Hi, ",
+          "start": 0.20071435546875,
+          "end": 0.681
+        }
+      ],
+      "metadata": {
+        "response_id": 0
+      }
+    },
+    {
+      "role": "user",
+      "content": "Hi. ",
+      "words": [
+        {
+          "word": "Hi. ",
+          "start": 0.7769999700000001,
+          "end": 1.097
+        }
+      ]
+    },
+    {
+      "role": "agent",
+      "content": "this is ",
+      "words": [
+        {
+          "word": "this ",
+          "start": 0.780499267578125,
+          "end": 1.001
+        },
+        {
+          "word": "is ",
+          "start": 1.081,
+          "end": 1.161
+        }
+      ],
+      "metadata": {
+        "response_id": 0
+      }
+    },
+    {
+      "role": "user",
+      "content": "If you record your name and reason for calling, I'll see if this person is available. ",
+      "words": [
+        {
+          "word": "If ",
+          "start": 1.387,
+          "end": 1.627
+        },
+        {
+          "word": "you ",
+          "start": 1.627,
+          "end": 1.787
+        },
+        {
+          "word": "record ",
+          "start": 1.787,
+          "end": 2.187
+        },
+        {
+          "word": "your ",
+          "start": 2.187,
+          "end": 2.427
+        },
+        {
+          "word": "name ",
+          "start": 2.427,
+          "end": 2.6670001
+        },
+        {
+          "word": "and ",
+          "start": 2.6670001,
+          "end": 2.9869998
+        },
+        {
+          "word": "reason ",
+          "start": 2.9869998,
+          "end": 3.307
+        },
+        {
+          "word": "for ",
+          "start": 3.307,
+          "end": 3.5469998
+        },
+        {
+          "word": "calling, ",
+          "start": 3.5469998,
+          "end": 3.787
+        },
+        {
+          "word": "I'll ",
+          "start": 4.067,
+          "end": 4.387000400000001
+        },
+        {
+          "word": "see ",
+          "start": 4.387000400000001,
+          "end": 4.4670003000000005
+        },
+        {
+          "word": "if ",
+          "start": 4.4670003000000005,
+          "end": 4.627000000000001
+        },
+        {
+          "word": "this ",
+          "start": 4.627000000000001,
+          "end": 4.787000000000001
+        },
+        {
+          "word": "person ",
+          "start": 4.787000000000001,
+          "end": 5.0270003
+        },
+        {
+          "word": "is ",
+          "start": 5.0270003,
+          "end": 5.187
+        },
+        {
+          "word": "available. ",
+          "start": 5.187,
+          "end": 5.427000400000001
+        }
+      ]
+    },
+    {
+      "role": "agent",
+      "content": "Reroute, an AI assistant calling for the phone test requested by your teammate.",
+      "words": [
+        {
+          "word": "Reroute, ",
+          "start": 6.303742919921875,
+          "end": 7.027
+        },
+        {
+          "word": "an ",
+          "start": 7.142210693359375,
+          "end": 7.347
+        },
+        {
+          "word": "AI ",
+          "start": 7.347,
+          "end": 7.667
+        },
+        {
+          "word": "assistant ",
+          "start": 7.667,
+          "end": 8.227
+        },
+        {
+          "word": "calling ",
+          "start": 8.227,
+          "end": 8.547
+        },
+        {
+          "word": "for ",
+          "start": 8.627,
+          "end": 8.707
+        },
+        {
+          "word": "the ",
+          "start": 8.787,
+          "end": 8.787
+        },
+        {
+          "word": "phone ",
+          "start": 8.787,
+          "end": 9.107
+        },
+        {
+          "word": "test ",
+          "start": 9.187,
+          "end": 9.427
+        },
+        {
+          "word": "requested ",
+          "start": 9.427,
+          "end": 9.907
+        },
+        {
+          "word": "by ",
+          "start": 9.987,
+          "end": 10.067
+        },
+        {
+          "word": "your ",
+          "start": 10.067,
+          "end": 10.147
+        },
+        {
+          "word": "teammate.",
+          "start": 10.227,
+          "end": 10.707
+        }
+      ],
+      "metadata": {
+        "response_id": 1
+      }
+    },
+    {
+      "role": "user",
+      "content": "Thanks. Plea ",
+      "words": [
+        {
+          "word": "Thanks. ",
+          "start": 15.627001,
+          "end": 15.947000000000001
+        },
+        {
+          "word": "Plea ",
+          "start": 16.576999999999998,
+          "end": 16.897
+        }
+      ]
+    },
+    {
+      "role": "agent",
+      "content": "Could you repeat that? I need a clear yes to run the tracer test.",
+      "words": [
+        {
+          "word": "Could ",
+          "start": 24.1414501953125,
+          "end": 24.37
+        },
+        {
+          "word": "you ",
+          "start": 24.45,
+          "end": 24.53
+        },
+        {
+          "word": "repeat ",
+          "start": 24.61,
+          "end": 24.85
+        },
+        {
+          "word": "that?",
+          "start": 24.85,
+          "end": 25.09
+        },
+        {
+          "word": " I ",
+          "start": 25.323288818359377,
+          "end": 25.41
+        },
+        {
+          "word": "need ",
+          "start": 25.49,
+          "end": 25.57
+        },
+        {
+          "word": "a ",
+          "start": 25.65,
+          "end": 25.65
+        },
+        {
+          "word": "clear ",
+          "start": 25.650000244140625,
+          "end": 26.13
+        },
+        {
+          "word": "yes ",
+          "start": 26.21,
+          "end": 26.53
+        },
+        {
+          "word": "to ",
+          "start": 26.61,
+          "end": 26.69
+        },
+        {
+          "word": "run ",
+          "start": 26.69,
+          "end": 26.85
+        },
+        {
+          "word": "the ",
+          "start": 26.93,
+          "end": 26.93
+        },
+        {
+          "word": "tracer ",
+          "start": 27.01,
+          "end": 27.25
+        },
+        {
+          "word": "test.",
+          "start": 27.25,
+          "end": 27.65
+        }
+      ],
+      "metadata": {
+        "response_id": 3
+      }
+    },
+    {
+      "role": "user",
+      "content": "Yes. ",
+      "words": [
+        {
+          "word": "Yes. ",
+          "start": 27.727,
+          "end": 28.046999999999997
+        }
+      ]
+    },
+    {
+      "role": "tool_call_invocation",
+      "tool_call_id": "[tool_call_1]",
+      "name": "tracer_ping",
+      "arguments": "{\"message\":\"reroute tracer confirmed\"}",
+      "time_sec": 29.047,
+      "type": "custom"
+    },
+    {
+      "role": "tool_call_result",
+      "tool_call_id": "[tool_call_1]",
+      "successful": true,
+      "content": "{\"result\":\"Tracer received. The backend connection is working.\"}",
+      "time_sec": 29.476
+    },
+    {
+      "role": "agent",
+      "content": "The backend acknowledged the tracer test. Thanks for your help.",
+      "words": [
+        {
+          "word": "The ",
+          "start": 30.089765380859376,
+          "end": 30.25
+        },
+        {
+          "word": "backend ",
+          "start": 30.33000048828125,
+          "end": 30.89
+        },
+        {
+          "word": "acknowledged ",
+          "start": 30.890001220703127,
+          "end": 31.61
+        },
+        {
+          "word": "the ",
+          "start": 31.69,
+          "end": 31.69
+        },
+        {
+          "word": "tracer ",
+          "start": 31.69,
+          "end": 32.01
+        },
+        {
+          "word": "test. ",
+          "start": 32.01,
+          "end": 32.57
+        },
+        {
+          "word": "Thanks ",
+          "start": 32.75692431640625,
+          "end": 32.97
+        },
+        {
+          "word": "for ",
+          "start": 33.05,
+          "end": 33.13
+        },
+        {
+          "word": "your ",
+          "start": 33.21,
+          "end": 33.21
+        },
+        {
+          "word": "help.",
+          "start": 33.21,
+          "end": 33.45
+        }
+      ],
+      "metadata": {
+        "response_id": 5
+      }
+    },
+    {
+      "role": "tool_call_invocation",
+      "tool_call_id": "[tool_call_2]",
+      "name": "end_call",
+      "arguments": "{\"execution_message\":\"The backend acknowledged the tracer test. Thanks for your help.\"}",
+      "time_sec": 33.598,
+      "type": "end_call"
+    }
+  ],
+  "event_timestamp": 1792884894845
+}

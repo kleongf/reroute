@@ -1,0 +1,36 @@
+{
+  "call": {
+    "call_id": "[call_1]",
+    "call_type": "phone_call",
+    "agent_id": "[agent_1]",
+    "agent_version": 0,
+    "agent_name": "Reroute tracer (issue 3)",
+    "retell_llm_dynamic_variables": {
+      "call_kind": "tracer",
+      "job_id": "tracer-job",
+      "driver_id": "tracer-driver",
+      "offer_id": "tracer-offer"
+    },
+    "contact_dynamic_variables": {},
+    "custom_sip_headers": {},
+    "call_status": "ongoing",
+    "start_timestamp": 1792884861244,
+    "latency": {},
+    "metadata": {
+      "purpose": "reroute-tracer"
+    },
+    "call_cost": {
+      "product_costs": [],
+      "total_duration_seconds": 0,
+      "total_duration_unit_price": 0,
+      "combined_cost": 0
+    },
+    "data_storage_setting": "everything",
+    "opt_in_signed_url": false,
+    "from_number": "[phone_1]",
+    "to_number": "[phone_2]",
+    "direction": "outbound"
+  },
+  "event": "call_started",
+  "event_timestamp": 1792884861244
+}
