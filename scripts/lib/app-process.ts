@@ -3,6 +3,17 @@ import { createWriteStream, type WriteStream } from 'node:fs';
 import { createServer } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
 
+/**
+ * Env for test and explore servers: fake phone numbers so Alex and Casey are callable through
+ * the server's FakeVoice (never a real phone), and a short simulated-Offer delay.
+ */
+export const TEST_SERVER_ENV = {
+  DRIVER_PHONE_ALEX: '+15550000001',
+  DRIVER_PHONE_CASEY: '+15550000002',
+  DISPATCHER_PHONE: '+15550000009',
+  SIMULATED_OFFER_MS: '500',
+} as const;
+
 /** Asks the OS for a currently free TCP port on localhost. */
 export function getFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {

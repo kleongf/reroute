@@ -60,6 +60,7 @@ interface Placement {
   status: PlacementStatus;
   previousDriverId: DriverId | null;
   startedAt: string | null; endedAt: string | null;
+  reason?: string;               // Disruption Placements: the Driver's stated reason (Job note is cleared on Placed)
 }
 
 type OfferStatus = 'pending' | 'accepted' | 'declined' | 'unanswered';
@@ -167,9 +168,24 @@ Status fields, shared by `report_status` and `decline_offer`: `capacity?` (int �
 ## SSE
 
 - `state`: the full snapshot, sent on connect and after every engine command. The dashboard re-renders from it; no client-side state merging.
-  `{ now, drivers: Driver[], jobs: Job[], placements: (Placement & { offers: Offer[]; evaluation: Evaluation | null })[], queue: PlacementId[], activeTraffic: TrafficEvent[], log: { at, text }[], etas }`
+  `{ now, resetAt, drivers: Driver[], jobs: Job[], placements: (Placement & { offers: Offer[]; evaluation: Evaluation | null })[], queue: PlacementId[], activeTraffic: TrafficEvent[], trafficEvents: { id, label }[], log: { at, text }[], etas, forecasts, disruptions, disruptionTally }`
+
   `etas: { minutes: EtaTable; source: Record<DriverId, Record<JobId, 'routed' | 'fixture'>> }`: base ETA to Pickup (before traffic) per Driver per Job, and its provenance. The dashboard labels `'routed'` as "routed ETA" and `'fixture'` as "fixture ETA" (fixture table, or straight line for Urgent Jobs).
-- `transcript`: `{ callId, kind: CallKind | 'inbound', driverId, role: 'agent' | 'user', text, at }`.
+
+  Derived in `toSnapshot` (`src/store/store.ts`), never stored. An *estimate* is the ETA table's minutes to Pickup (routed or fixture) + active traffic for that Driver + `serviceMinutes` + `tripMinutes`, from a start time; `minutesLate` = arrival − deadline, rounded (negative = minutes to spare). Traffic is what is active now.
+
+  ```ts
+  forecasts: { jobId, driverId, arrivalAt, minutesLate }[]       // held, uncollected Jobs, from `now`
+  disruptions: {                                                  // one per Placement with trigger 'disruption'
+    placementId, jobId, driverId /* who reported */, reason: string | null, reportedAt /* queuedAt */,
+    status: PlacementStatus,
+    before: { driverId, arrivalAt: string | null, minutesLate: number | null },        // reporter, from reportedAt
+    after: { driverId, arrivalAt: string | null, minutesLate: number | null } | null,  // accepter, from endedAt; null unless Placed
+    endedAt: string | null, secondsToFix: number | null,          // reportedAt → Placed; null unless Placed
+  }[]
+  disruptionTally: { fixed, escalated, open, averageSecondsToFix: number | null }
+  ```
+- `transcript`: `{ callId, kind: CallKind | 'inbound', driverId, role: 'agent' | 'user', text, at, utteranceId? }`. The dashboard upserts lines by `utteranceId` (Retell revises a line as speech continues) and appends when it is absent.
 - `heartbeat`: unchanged.
 
 ## Retell transport integration (#6)

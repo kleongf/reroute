@@ -10,6 +10,12 @@ export const stepSchema = z.discriminatedUnion('action', [
   z.strictObject({ action: z.literal('press'), selector, key: z.string().min(1) }),
   z.strictObject({ action: z.literal('wait'), ms: z.number().int().nonnegative() }),
   z.strictObject({ action: z.literal('waitFor'), selector }),
+  /** POST JSON to the app (steps file only), e.g. to drive the demo through real endpoints. */
+  z.strictObject({
+    action: z.literal('post'),
+    path: z.string().min(1),
+    body: z.unknown().optional(),
+  }),
   z.strictObject({
     action: z.literal('screenshot'),
     name: z.string().regex(/^[\w.-]+$/, 'use letters, digits, dot, dash, underscore'),

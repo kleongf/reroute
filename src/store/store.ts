@@ -1,6 +1,17 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { comparePriority } from '../domain/priority.ts';
-import type { EtaSource, EtaSourceTable, StateSnapshot, World } from '../domain/types.ts';
+import { addMinutes } from '../domain/time.ts';
+import type {
+  DeliveryEstimate,
+  DisruptionSummary,
+  DriverId,
+  EtaSource,
+  EtaSourceTable,
+  Job,
+  JobForecast,
+  StateSnapshot,
+  World,
+} from '../domain/types.ts';
 
 /**
  * Holds the World. Commands run synchronously on Node's single thread, so each `update` is
@@ -62,7 +73,79 @@ export function toSnapshot(world: World, now: Date): StateSnapshot {
     activeTraffic: world.trafficEvents.filter((t) => world.activeTrafficIds.includes(t.id)),
     trafficEvents: world.trafficEvents.map((t) => ({ id: t.id, label: t.label })),
     log: world.log,
+    ...deriveDisruptions(world),
+    forecasts: forecasts(world, now),
     etas: { minutes: world.etaMinutes, source: etaSources(world) },
+  };
+}
+
+const MINUTE_MS = 60_000;
+
+/** Estimated delivery if `driverId` heads for `job` at `fromIso`: ETA + traffic + service + trip. */
+function estimate(world: World, driverId: DriverId, job: Job, fromIso: string): DeliveryEstimate {
+  const eta = world.etaMinutes[driverId]?.[job.id];
+  if (eta === undefined) return { driverId, arrivalAt: null, minutesLate: null };
+  let traffic = 0;
+  for (const t of world.trafficEvents) {
+    if (world.activeTrafficIds.includes(t.id)) traffic += t.addedMinutes[driverId] ?? 0;
+  }
+  const arrivalAt = addMinutes(fromIso, eta + traffic + job.serviceMinutes + job.tripMinutes);
+  const minutesLate = Math.round((Date.parse(arrivalAt) - Date.parse(job.deadline)) / MINUTE_MS);
+  return { driverId, arrivalAt, minutesLate };
+}
+
+/** Held, uncollected Jobs: when their current Driver should deliver, as of `now`. */
+function forecasts(world: World, now: Date): JobForecast[] {
+  const out: JobForecast[] = [];
+  for (const job of world.jobs) {
+    if (!job.driverId || job.collected || job.status === 'done') continue;
+    const e = estimate(world, job.driverId, job, now.toISOString());
+    if (e.arrivalAt === null || e.minutesLate === null) continue;
+    out.push({
+      jobId: job.id,
+      driverId: job.driverId,
+      arrivalAt: e.arrivalAt,
+      minutesLate: e.minutesLate,
+    });
+  }
+  return out;
+}
+
+/** One summary per Disruption Placement: before (reporting Driver) → after (accepting Driver). */
+function deriveDisruptions(world: World): Pick<StateSnapshot, 'disruptions' | 'disruptionTally'> {
+  const disruptions: DisruptionSummary[] = [];
+  for (const p of world.placements) {
+    const job = world.jobs.find((j) => j.id === p.jobId);
+    if (p.trigger !== 'disruption' || !p.previousDriverId || !job) continue;
+    const accepted = world.offers.find((o) => o.placementId === p.id && o.status === 'accepted');
+    const placed = p.status === 'placed' && accepted && p.endedAt;
+    disruptions.push({
+      placementId: p.id,
+      jobId: p.jobId,
+      driverId: p.previousDriverId,
+      reason: p.reason ?? null,
+      reportedAt: p.queuedAt,
+      status: p.status,
+      before: estimate(world, p.previousDriverId, job, p.queuedAt),
+      after: placed ? estimate(world, accepted.driverId, job, p.endedAt ?? p.queuedAt) : null,
+      endedAt: p.endedAt,
+      secondsToFix: placed
+        ? Math.round((Date.parse(p.endedAt ?? p.queuedAt) - Date.parse(p.queuedAt)) / 1000)
+        : null,
+    });
+  }
+  const fixedTimes = disruptions.flatMap((d) => (d.secondsToFix === null ? [] : [d.secondsToFix]));
+  return {
+    disruptions,
+    disruptionTally: {
+      fixed: fixedTimes.length,
+      escalated: disruptions.filter((d) => d.status === 'escalated').length,
+      open: disruptions.filter((d) => d.status === 'queued' || d.status === 'running').length,
+      averageSecondsToFix:
+        fixedTimes.length === 0
+          ? null
+          : Math.round(fixedTimes.reduce((a, b) => a + b, 0) / fixedTimes.length),
+    },
   };
 }
 

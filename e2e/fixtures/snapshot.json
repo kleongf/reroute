@@ -207,5 +207,17 @@
       "label": "I-280 closed"
     }
   ],
-  "log": []
+  "log": [],
+  "forecasts": [],
+  "disruptions": [],
+  "disruptionTally": {
+    "fixed": 0,
+    "escalated": 0,
+    "open": 0,
+    "averageSecondsToFix": null
+  },
+  "etas": {
+    "minutes": {},
+    "source": {}
+  }
 }

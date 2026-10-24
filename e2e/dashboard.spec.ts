@@ -48,7 +48,8 @@ test.describe('scenario', () => {
     await expect(drivers).toHaveCount(6);
     const j17 = page.getByTestId('jobs-table').locator('tbody tr', { hasText: 'J17' });
     await expect(j17).toContainText('Alex');
-    await expect(page.getByText('simulated positions').first()).toBeVisible();
+    await expect(page.getByTestId('provenance')).toContainText('simulated positions');
+    await expect(page.getByTestId('provenance')).toBeVisible();
 
     const reset = page.waitForResponse('/api/reset');
     await page.getByTestId('reset').click();
