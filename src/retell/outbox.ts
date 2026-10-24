@@ -23,6 +23,7 @@ export function createVoiceOutbox(deps: {
   store: Store;
   clock: Clock;
   transport: VoicePort;
+  onUnanswered?: (offerId: string) => Promise<unknown>;
 }): VoiceOutbox {
   const { db, store, clock, transport } = deps;
   db.exec(`CREATE TABLE IF NOT EXISTS voice_outbox (
@@ -91,6 +92,7 @@ export function createVoiceOutbox(deps: {
             });
         });
         if (attempts < 3) schedule(1000);
+        else if (offerId && store.get().resetAt === resetAt) await deps.onUnanswered?.(offerId);
       }
     }
   }

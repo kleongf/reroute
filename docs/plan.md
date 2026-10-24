@@ -58,7 +58,20 @@ Draft run order (expect revisions):
 | 0:30–1:30 | Inject "I-280 closed"; Reroute calls Alex, who can't make it | J17 At Risk → Late; live transcript |
 | 1:30–2:30 | Placement: ranking with reasons; Blair's simulated Offer declined; Reroute calls Casey, who accepts | Pending Offer → Placed; Blair's capacity updates |
 | 2:30–3:00 | Reroute calls Alex back | Assignment line moves Alex → Casey; elapsed time Disruption → Placed |
-| 3:00–4:00 | Dispatcher adds an Urgent Job; Reroute calls Alex, who accepts | Queue, Placement, Placed |
+| 3:00–4:00 | Dispatcher adds the Urgent Job below; Reroute calls Alex, who accepts | Queue, Placement, Placed |
+
+Urgent Job to type on stage (exactly; covered by `src/demo/demo-story.test.ts`):
+
+| Field | Value |
+|---|---|
+| Label | Hospital samples |
+| Pickup | SF General Lab (37.7557, -122.4048) |
+| Drop-off | Mission Bay Clinic (37.7684, -122.3912) |
+| Parcels | 2 |
+| Deadline | 90 min from now |
+| Tier | high |
+
+Why Alex gets it: 2 parcels rules out Casey (1 slot left after J17) and Blair (1 slot after her simulated decline); Dana is off at reset + 20 min, Eli has 0 slots, Fran has no phone. Alex still carries the I-280 +40 min, so the 90-minute deadline is what keeps him in. Typing 1 parcel sends the Offer to Casey instead.
 
 Escalation is covered by tests, not shown live.
 

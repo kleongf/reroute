@@ -125,7 +125,7 @@ requireElement('reset').addEventListener('click', () => {
 // ---- Placement panel (#4): self-contained; renders the latest Placement from `state`. ----
 
 /**
- * @typedef {{ id: string; driverId: string; status: string; simulated: boolean }} OfferView
+ * @typedef {{ id: string; driverId: string; status: string; simulated: boolean; declineReason: string | null }} OfferView
  * @typedef {{ driverId: string; etaToPickupMinutes: number }} EligibleView
  * @typedef {{ driverId: string; reason: { kind: string; text: string } }} IneligibleView
  * @typedef {{
@@ -189,8 +189,9 @@ function renderPlacement(snapshot) {
   const offers = el('ul', '', { testid: 'offer-list' });
   for (const o of placement.offers) {
     const sim = o.simulated ? ' (simulated Offer)' : '';
+    const why = o.declineReason ? ` (“${o.declineReason}”)` : '';
     offers.append(
-      el('li', `Offer to ${nameOf(o.driverId)}${sim}: ${o.status}`, { status: o.status }),
+      el('li', `Offer to ${nameOf(o.driverId)}${sim}: ${o.status}${why}`, { status: o.status }),
     );
   }
   if (offers.children.length === 0) offers.append(el('li', 'No Offers yet'));
@@ -210,4 +211,105 @@ source.addEventListener('state', (event) => {
   /** @type {unknown} */
   const snapshot = JSON.parse(String(event.data));
   renderPlacement(/** @type {PlacementSnapshot} */ (snapshot));
+});
+
+// ---- Traffic (#8): one "Inject traffic" button per fixture traffic event. ----
+
+/**
+ * @typedef {{ trafficEvents: { id: string; label: string }[]; activeTraffic: { id: string }[] }} TrafficSnapshot
+ */
+
+const trafficButtonsEl = requireElement('traffic-buttons');
+
+/** @param {TrafficSnapshot} snapshot */
+function renderTrafficButtons(snapshot) {
+  trafficButtonsEl.replaceChildren(
+    ...snapshot.trafficEvents.map((t) => {
+      const active = snapshot.activeTraffic.some((a) => a.id === t.id);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset['testid'] = `inject-traffic-${t.id}`;
+      button.textContent = active
+        ? `${t.label} (simulated traffic, active)`
+        : `Inject traffic: ${t.label} (simulated traffic)`;
+      button.disabled = active;
+      button.addEventListener('click', () => {
+        void fetch(`/api/traffic/${encodeURIComponent(t.id)}`, { method: 'POST' });
+      });
+      return button;
+    }),
+  );
+}
+
+// ---- Urgent Job form + Placement Queue (#9): self-contained; posts to /api/jobs. ----
+
+/**
+ * @typedef {{
+ *   jobs: { id: string; label: string; deadline: string }[];
+ *   placements: { id: string; jobId: string; tier: string }[];
+ *   queue: string[];
+ * }} QueueSnapshot
+ */
+
+const urgentForm = /** @type {HTMLFormElement} */ (requireElement('urgent-form'));
+const urgentError = requireElement('urgent-error');
+const queueEl = requireElement('placement-queue');
+
+urgentForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const data = new FormData(urgentForm);
+  const field = (/** @type {string} */ name) => {
+    const value = data.get(name);
+    return typeof value === 'string' ? value.trim() : '';
+  };
+  const body = {
+    label: field('label'),
+    pickup: { name: field('pickup') },
+    dropoff: { name: field('dropoff') },
+    parcels: Number(field('parcels')),
+    deadlineOffsetMin: Number(field('deadlineOffsetMin')),
+    tier: field('tier'),
+  };
+  urgentError.textContent = '';
+  void fetch('/api/jobs', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(async (res) => {
+    if (res.ok) {
+      urgentForm.reset();
+      return;
+    }
+    /** @type {unknown} */
+    const raw = await res.json().catch(() => ({}));
+    const payload = /** @type {{ message?: string }} */ (raw);
+    urgentError.textContent = payload.message ?? `Could not add Urgent Job (${String(res.status)})`;
+  });
+});
+
+/** @param {QueueSnapshot} snapshot */
+function renderQueue(snapshot) {
+  const items = snapshot.queue.map((placementId, i) => {
+    const placement = snapshot.placements.find((p) => p.id === placementId);
+    const job = snapshot.jobs.find((j) => j.id === placement?.jobId);
+    const li = document.createElement('li');
+    li.dataset['placementId'] = placementId;
+    const name = job ? `${job.id} ${job.label}` : placementId;
+    const due = job ? clockTime(job.deadline) : '—';
+    li.textContent = `${String(i + 1)}. ${name} · ${placement?.tier ?? ''} · due ${due}`;
+    return li;
+  });
+  if (items.length === 0) {
+    const li = document.createElement('li');
+    li.textContent = 'Queue empty';
+    items.push(li);
+  }
+  queueEl.replaceChildren(...items);
+}
+
+source.addEventListener('state', (event) => {
+  /** @type {unknown} */
+  const snapshot = JSON.parse(String(event.data));
+  renderTrafficButtons(/** @type {TrafficSnapshot} */ (snapshot));
+  renderQueue(/** @type {QueueSnapshot} */ (snapshot));
 });

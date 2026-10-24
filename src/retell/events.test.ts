@@ -19,7 +19,12 @@ describe('Retell call events', () => {
     const unsubscribe = transcripts.subscribe((entry) => {
       observed.push(entry.text);
     });
-    const deps = { store: h.store, clock: h.clock, engine: {}, transcripts };
+    const deps = {
+      store: h.store,
+      clock: h.clock,
+      engine: { markUnanswered: () => Promise.resolve() },
+      transcripts,
+    };
     const raw = {
       event: 'transcript_updated',
       call: {

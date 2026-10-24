@@ -21,6 +21,7 @@
       </p>
       <p class="provenance">simulated positions &middot; fixture ETA</p>
       <button id="reset" data-testid="reset" type="button">Reset demo</button>
+      <span id="traffic-buttons" data-testid="traffic-buttons"></span>
     </header>
     <main id="dashboard" data-testid="dashboard" class="grid">
       <section class="panel map" aria-label="Map">
@@ -59,6 +60,32 @@
       <section class="panel" aria-label="Placement" data-testid="placement-panel">
         <h2>Placement</h2>
         <div id="placement">No Placement yet.</div>
+      </section>
+      <section class="panel" aria-label="Urgent Job" data-testid="urgent-panel">
+        <h2>Urgent Job</h2>
+        <form id="urgent-form" data-testid="urgent-form" class="urgent-form">
+          <label>Label <input name="label" required placeholder="Hospital samples" /></label>
+          <label>Pickup <input name="pickup" required placeholder="SF General Lab" /></label>
+          <label>Drop-off <input name="dropoff" required placeholder="Mission Bay Clinic" /></label>
+          <label>Parcels <input name="parcels" type="number" min="1" value="1" required /></label>
+          <label
+            >Due in (min) <input name="deadlineOffsetMin" type="number" min="1" value="60" required
+          /></label>
+          <label
+            >Tier
+            <select name="tier">
+              <option value="high">High</option>
+              <option value="normal" selected>Normal</option>
+            </select></label
+          >
+          <button type="submit">Add Urgent Job</button>
+          <p id="urgent-error" data-testid="urgent-error" class="urgent-error" role="alert"></p>
+        </form>
+        <h3>Placement Queue</h3>
+        <ol id="placement-queue" data-testid="placement-queue">
+          <li>Queue empty</li>
+        </ol>
+        <p class="provenance">Urgent Job ETAs: fixture ETA (straight line at city speed)</p>
       </section>
     </main>
   </body>

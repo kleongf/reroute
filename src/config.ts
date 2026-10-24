@@ -12,6 +12,10 @@ const envSchema = z.object({
   RETELL_AGENT_AT_RISK_CHECK: z.string().min(1).optional(),
   RETELL_AGENT_RELEASE: z.string().min(1).optional(),
   RETELL_AGENT_ESCALATION: z.string().min(1).optional(),
+  SIMULATED_OFFER_MS: z.coerce.number().int().min(0).default(4_000),
+  /** osrm = refresh ETAs from the public OSRM demo server; off = fixture/straight-line only. */
+  ROUTING: z.enum(['osrm', 'off']).default('off'),
+  ROUTING_TIMEOUT_MS: z.coerce.number().int().positive().default(1_500),
 });
 
 export type Config = z.infer<typeof envSchema>;

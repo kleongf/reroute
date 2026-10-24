@@ -168,4 +168,110 @@ describe('authenticated Retell HTTP boundary', () => {
     expect(result.status).toBe(409);
     expect((await h.state()).jobs.find((j) => j.id === 'J17')?.driverId).toBe('alex');
   });
+  it('call-ended delivery marks a pending Offer Unanswered once and never accepts silence', async () => {
+    await post('/tools/report_disruption', disruption);
+    const call = h.voice.calls[0];
+    const ended = {
+      event: 'call_ended',
+      call: { call_id: call?.callId, retell_llm_dynamic_variables: call?.vars },
+    };
+    expect((await post('/webhooks/retell', ended)).status).toBe(204);
+    const state = await h.state();
+    expect(state.placements[0]?.offers[0]?.status).toBe('unanswered');
+    expect(state.placements[0]?.status).toBe('escalated');
+    expect(state.jobs.find((job) => job.id === 'J17')?.driverId).toBe('alex');
+    expect(h.voice.calls.map((placed) => placed.kind)).toEqual(['offer', 'escalation']);
+    await post('/webhooks/retell', ended);
+    expect(await h.state()).toEqual(state);
+    expect(h.voice.calls).toHaveLength(2);
+  });
+
+  it('decline status and inbound status retries preserve capacity and do not bump versions twice', async () => {
+    await post('/tools/report_disruption', disruption);
+    const call = h.voice.calls[0];
+    const decline = {
+      name: 'decline_offer',
+      call: {
+        call_id: call?.callId,
+        direction: 'outbound',
+        to_number: HARNESS_PHONES['DRIVER_PHONE_CASEY'],
+        retell_llm_dynamic_variables: call?.vars,
+      },
+      args: { reason: 'only room for one', capacity: 1 },
+    };
+    expect((await post('/tools/decline_offer', decline)).status).toBe(200);
+    const state = await h.state();
+    expect(state.drivers.find((driver) => driver.id === 'casey')?.capacity).toBe(1);
+    await post('/tools/decline_offer', decline);
+    expect(await h.state()).toEqual(state);
+    const status = {
+      name: 'report_status',
+      call: { call_id: 'call-status-casey', from_number: HARNESS_PHONES['DRIVER_PHONE_CASEY'] },
+      args: { capacity: 3, available_until: '2026-10-24T20:00:00.000Z' },
+    };
+    const results = await Promise.all([
+      post('/tools/report_status', status),
+      post('/tools/report_status', status),
+    ]);
+    expect(results.map((result) => result.status)).toEqual([200, 200]);
+    expect(await results[0].json()).toEqual(await results[1].json());
+    const driver = (await h.state()).drivers.find((current) => current.id === 'casey');
+    expect(driver).toMatchObject({ capacity: 3, availableUntil: '2026-10-24T20:00:00.000Z' });
+    const before = await h.state();
+    await post('/tools/report_status', status);
+    expect(await h.state()).toEqual(before);
+  });
+
+  it('streams signed transcript updates over SSE, replays them on reconnect, and clears on Reset demo', async () => {
+    const update = {
+      event: 'transcript_updated',
+      call: {
+        call_id: 'call-transcript',
+        from_number: HARNESS_PHONES['DRIVER_PHONE_ALEX'],
+        transcript_object: [{ role: 'user', content: 'I cannot make it.' }],
+      },
+    };
+    expect((await post('/webhooks/retell', update)).status).toBe(204);
+    const controller = new AbortController();
+    const response = await app.request('/events', { signal: controller.signal });
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error('Missing SSE body');
+    let text = '';
+    try {
+      while (!text.includes('I cannot make it.')) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        const value: unknown = chunk.value;
+        if (!(value instanceof Uint8Array)) throw new Error('Invalid SSE bytes');
+        text += new TextDecoder().decode(value);
+      }
+      expect(text).toContain('event: transcript');
+      expect(text).toContain('"utteranceId":"call-transcript:0"');
+      expect(text).toContain('"driverId":"alex"');
+    } finally {
+      controller.abort();
+      await reader.cancel();
+    }
+    await h.post('/api/reset');
+    // The secure app owns the transcript buffer, so use its reset action as the dashboard does.
+    await app.request('/api/reset', { method: 'POST' });
+    const nextController = new AbortController();
+    const next = await app.request('/events', { signal: nextController.signal });
+    const nextReader = next.body?.getReader();
+    if (!nextReader) throw new Error('Missing SSE body');
+    let fresh = '';
+    try {
+      while (!fresh.includes('event: heartbeat')) {
+        const chunk = await nextReader.read();
+        if (chunk.done) break;
+        const value: unknown = chunk.value;
+        if (!(value instanceof Uint8Array)) throw new Error('Invalid SSE bytes');
+        fresh += new TextDecoder().decode(value);
+      }
+      expect(fresh).not.toContain('call-transcript');
+    } finally {
+      nextController.abort();
+      await nextReader.cancel();
+    }
+  });
 });

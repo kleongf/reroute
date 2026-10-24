@@ -17,8 +17,8 @@ export function buildRetellConfig(baseUrl: string) {
     .join('\n\n');
   const statusProperties = {
     capacity: { type: 'integer', minimum: 0 },
-    availableFrom: { type: 'string', format: 'date-time' },
-    availableUntil: { type: 'string', format: 'date-time' },
+    available_from: { type: 'string', format: 'date-time' },
+    available_until: { type: 'string', format: 'date-time' },
   };
   const tools = [
     {
@@ -62,11 +62,7 @@ export function buildRetellConfig(baseUrl: string) {
       properties: {
         offer_id: { type: 'string' },
         reason: { type: 'string' },
-        status_update: {
-          type: 'object',
-          properties: statusProperties,
-          additionalProperties: false,
-        },
+        ...statusProperties,
       },
       required: ['offer_id'],
     },

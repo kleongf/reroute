@@ -9,6 +9,7 @@ import { retellAuthentication } from './retell/auth.ts';
 import { retellCallContext } from './retell/context.ts';
 import { handleRetellEvent, type CallEventEngine } from './retell/events.ts';
 import { retellIdempotency } from './retell/idempotency.ts';
+import { registerUrgentJobs } from './placement/urgent-route.ts';
 import { retellWebhookSchema } from './retell/schemas.ts';
 import { registerTools } from './retell/tools.ts';
 import { loadScenario, type PhoneBook, type Scenario } from './store/scenario.ts';
@@ -83,7 +84,14 @@ export function createApp(deps: AppDeps): Hono {
     return c.json(toSnapshot(deps.store.get(), deps.clock.now()));
   });
 
-  registerTools(app, { engine: deps.engine, store: deps.store });
+  app.post('/api/traffic/:id', async (c) => {
+    const r = await deps.engine.injectTraffic(c.req.param('id'));
+    if (!r.ok) return c.json({ error: r.message }, 404);
+    return c.json(toSnapshot(deps.store.get(), deps.clock.now()));
+  });
+
+  registerTools(app, { engine: deps.engine, store: deps.store, clock: deps.clock });
+  registerUrgentJobs(app, { engine: deps.engine, store: deps.store, clock: deps.clock });
 
   app.post('/webhooks/retell', async (c) => {
     let body: unknown;

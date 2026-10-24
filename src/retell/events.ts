@@ -5,7 +5,7 @@ import type { CallKind } from '../voice/port.ts';
 import type { RetellWebhook } from './schemas.ts';
 
 export interface CallEventEngine {
-  markUnanswered?: (offerId: string) => Promise<unknown>;
+  markUnanswered: (offerId: string) => Promise<unknown>;
 }
 const kinds: readonly string[] = ['offer', 'at_risk_check', 'release', 'escalation'];
 
@@ -26,7 +26,7 @@ export async function handleRetellEvent(
           (vars['reroute_call_id'] && o.callId === vars['reroute_call_id'])),
     );
     if (offer && (!vars['offer_id'] || vars['offer_id'] === offer.id))
-      await deps.engine.markUnanswered?.(offer.id);
+      await deps.engine.markUnanswered(offer.id);
   }
   if (event.event !== 'transcript_updated') return;
   const entries =
