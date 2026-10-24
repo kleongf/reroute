@@ -6,7 +6,7 @@ import type { Clock } from './domain/clock.ts';
 import { registerNextApp } from './next-app.ts';
 import type { Engine } from './placement/engine.ts';
 import { registerUrgentJobs } from './placement/urgent-route.ts';
-import { retellWebhookSchema } from './retell/schemas.ts';
+import { retellWebhookSchema, tracerPingSchema } from './retell/schemas.ts';
 import { registerTools } from './retell/tools.ts';
 import { loadScenario, type PhoneBook, type Scenario } from './store/scenario.ts';
 import { toSnapshot, type Store } from './store/store.ts';
@@ -63,6 +63,26 @@ export function createApp(deps: AppDeps): Hono {
   app.post('/api/reset', (c) => {
     deps.store.replace(loadScenario(deps.scenario, deps.clock.now(), deps.phones));
     return c.json(toSnapshot(deps.store.get(), deps.clock.now()));
+  });
+
+  // Capture only: this route does not authenticate Retell or authorize domain changes.
+  app.post('/tools/tracer_ping', async (c) => {
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid_json' }, 400);
+    }
+    const parsed = tracerPingSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json({ error: 'invalid_body', issues: parsed.error.issues }, 400);
+    }
+    deps.db
+      .prepare(
+        'INSERT INTO webhook_events (received_at, source, event, payload) VALUES (?, ?, ?, ?)',
+      )
+      .run(deps.clock.now().toISOString(), 'retell', 'tool_call:tracer_ping', JSON.stringify(body));
+    return c.json({ result: 'Tracer received. The backend connection is working.' });
   });
 
   app.post('/api/traffic/:id', async (c) => {
