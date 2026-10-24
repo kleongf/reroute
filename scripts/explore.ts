@@ -6,7 +6,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { chromium, type Page } from '@playwright/test';
-import { getFreePort, startApp, type RunningApp } from './lib/app-process.ts';
+import { getFreePort, startApp, TEST_SERVER_ENV, type RunningApp } from './lib/app-process.ts';
 import { parseExploreArgs, stepsFileSchema, type Step } from './lib/steps.ts';
 
 const USAGE = `Usage: pnpm ui:explore [options] [steps...]
@@ -56,6 +56,11 @@ async function runStep(page: Page, step: Step, shoot: (name: string) => Promise<
     case 'screenshot':
       await shoot(step.name);
       return;
+    case 'post': {
+      const res = await page.request.post(step.path, { data: step.body ?? {} });
+      if (!res.ok()) throw new Error(`POST ${step.path} → ${String(res.status())}`);
+      return;
+    }
   }
 }
 
@@ -83,7 +88,7 @@ async function main(): Promise<number> {
     app = await startApp({
       nodeArgs: ['--import', 'tsx', 'src/server.ts'],
       port: await getFreePort(),
-      env: { DATABASE_PATH: join(outDir, 'explore.db') },
+      env: { ...TEST_SERVER_ENV, DATABASE_PATH: join(outDir, 'explore.db') },
       logFile: serverLog,
     });
     baseUrl = app.baseUrl;

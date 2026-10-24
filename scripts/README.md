@@ -38,6 +38,7 @@ Steps run in the order given. Two-value flags use `::` as the separator. JSON st
   { "action": "press", "selector": "#search", "key": "Enter" },
   { "action": "wait", "ms": 250 },
   { "action": "waitFor", "selector": "[data-testid=dashboard]" },
+  { "action": "post", "path": "/api/traffic/i280" },
   { "action": "screenshot", "name": "done", "fullPage": true }
 ]
 ```

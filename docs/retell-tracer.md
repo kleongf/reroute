@@ -246,7 +246,7 @@ capture-only tracer ticket.
 
 Local verification:
 
-The final integrated branch passed `pnpm verify`: 93 unit tests, five browser
+The final integrated branch passed `pnpm verify`: 133 unit tests, eleven browser
 tests, formatting, TypeScript checks, lint, build, server boot, and clean shutdown.
 
 ```sh

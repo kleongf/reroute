@@ -12,6 +12,7 @@ The seams between tickets. Each ticket owns one side of a seam; change a contrac
 | `src/store/` | SQLite schema, repository, transactions, fixture load/reset | types |
 | `src/placement/engine.ts` | Placement lifecycle; the only writer of Offers, Placements, assignments | store, eligibility, priority, `VoicePort` |
 | `src/voice/port.ts` | `VoicePort` interface + `FakeVoice` for tests | types |
+| `src/routing/` | `RoutingPort` + `FakeRouting`, OSRM implementation, `attachRoutedEtas()` background ETA refresh | types, store |
 | `src/retell/` | `RetellVoice implements VoicePort`, tool + event webhooks | engine, store |
 | `src/events/` | In-process bus; `/events` SSE emits `state` and `transcript` | store |
 | `public/` | Dashboard: renders `state` snapshots, posts to `/api/*` | HTTP only |
@@ -59,6 +60,7 @@ interface Placement {
   status: PlacementStatus;
   previousDriverId: DriverId | null;
   startedAt: string | null; endedAt: string | null;
+  reason?: string;               // Disruption Placements: the Driver's stated reason (Job note is cleared on Placed)
 }
 
 type OfferStatus = 'pending' | 'accepted' | 'declined' | 'unanswered';
@@ -119,7 +121,7 @@ interface VoicePort {
 }
 ```
 
-Vars always include `call_kind`, plus `job_id`, `job_label`, `pickup_name`, `deadline_spoken` ("3:00 PM"), `parcels`, and as relevant `offer_id`, `driver_name`, `reason`. Simulated Drivers never reach `VoicePort`; the engine resolves their Offer itself after a short delay (`SIMULATED_OFFER_MS`, default 4000) using the fixture's scripted reply.
+Vars always include `call_kind`, plus `job_id`, `job_label`, `pickup_name`, `deadline_spoken` ("3:00 PM"), `parcels`, and as relevant `offer_id`, `driver_id`, `driver_name`, `reason`. `at_risk_check` calls also carry `eta_spoken` (estimated arrival with traffic, "3:08 PM") and `delay_minutes`; `reason` is the traffic event label. Simulated Drivers never reach `VoicePort`; the engine resolves their Offer itself after a short delay (`SIMULATED_OFFER_MS`, default 4000) using the fixture's scripted reply.
 
 ## Engine commands
 
@@ -137,6 +139,17 @@ All are idempotent: re-sending one whose effect already happened returns the cur
 | `addUrgentJob(input, tier)` | dashboard | create Job `unassigned`, queue Placement |
 | `reset()` | dashboard | reload fixtures relative to now |
 
+## RoutingPort
+
+```ts
+interface RoutingPort {
+  minutes(from: LatLng, to: LatLng): Promise<number>;             // rejects on error / timeout
+  table?(sources: LatLng[], destinations: LatLng[]): Promise<(number | null)[][]>;  // batch form
+}
+```
+
+`ROUTING=osrm` (default `off`) makes the server call `attachRoutedEtas(store, osrm)`: it watches the store, and whenever a Driver × Job pair appears that has not been routed since the last reset (a reset, an Urgent Job), it asks the public OSRM demo server (`router.project-osrm.org`, driving, one `table` request, timeout `ROUTING_TIMEOUT_MS`, default 1500) in the background and writes the answers (whole minutes, rounded up) into the ETA table. Commands and tool calls never wait for it: their responses carry the fixture / straight-line ETAs until the routed ones land. Any error or timeout keeps the fixture value. Answers that arrive after a newer reset are dropped. Traffic minutes still add on top.
+
 ## HTTP
 
 | Route | Body | Notes |
@@ -144,15 +157,33 @@ All are idempotent: re-sending one whose effect already happened returns the cur
 | `POST /tools/:name` | Retell custom-function payload `{ name, call, args }` | Responds `{ result: string }` the agent can speak; < 1 s |
 | `POST /webhooks/retell` | Retell call events | `call_ended` → `markUnanswered`; `transcript_updated` → `transcript` SSE |
 | `POST /api/reset` | — | |
-| `POST /api/traffic/:id` | — | |
-| `POST /api/jobs` | `{ label, pickup, dropoff, parcels, deadlineOffsetMin, tier }` | |
+| `POST /api/traffic/:id` | — | `injectTraffic`; returns the snapshot; unknown id → 404 |
+| `POST /api/jobs` | `{ label, pickup, dropoff, parcels, deadlineOffsetMin, tier }` | `pickup`/`dropoff` are `{ name, lat?, lng? }` (default: central SF). 201 `{ ok, message, jobId, state }`; 400 `{ error, message }`. Urgent Job ETAs: straight line at 20 km/h, rounded up, stored in the ETA table |
 | `GET /events` | — | SSE |
 
 Tool names: `get_my_jobs`, `report_disruption`, `confirm_on_track`, `report_status`, `accept_offer`, `decline_offer`. Inbound callers are identified by `call.from_number`; outbound calls carry `driver_id` in vars.
 
+Status fields, shared by `report_status` and `decline_offer`: `capacity?` (int ≥ 0), `available_from?`, `available_until?` (ISO, or spoken "4 PM" / "16:30" / bare "4" = next 4 o'clock, demo time zone). `decline_offer` also takes `offer_id?` (else vars) and `reason?`. Escalation calls carry `reason` (one sentence) plus the Job vars.
+
 ## SSE
 
 - `state`: the full snapshot, sent on connect and after every engine command. The dashboard re-renders from it; no client-side state merging.
-  `{ now, drivers: Driver[], jobs: Job[], placements: (Placement & { offers: Offer[]; evaluation: Evaluation | null })[], queue: PlacementId[], activeTraffic: TrafficEvent[], log: { at, text }[] }`
-- `transcript`: `{ callId, kind: CallKind | 'inbound', driverId, role: 'agent' | 'user', text, at }`.
+  `{ now, resetAt, drivers: Driver[], jobs: Job[], placements: (Placement & { offers: Offer[]; evaluation: Evaluation | null })[], queue: PlacementId[], activeTraffic: TrafficEvent[], trafficEvents: { id, label }[], log: { at, text }[], etas, forecasts, disruptions, disruptionTally }`
+
+  `etas: { minutes: EtaTable; source: Record<DriverId, Record<JobId, 'routed' | 'fixture'>> }`: base ETA to Pickup (before traffic) per Driver per Job, and its provenance. The dashboard labels `'routed'` as "routed ETA" and `'fixture'` as "fixture ETA" (fixture table, or straight line for Urgent Jobs).
+
+  Derived in `toSnapshot` (`src/store/store.ts`), never stored. An *estimate* is the ETA table's minutes to Pickup (routed or fixture) + active traffic for that Driver + `serviceMinutes` + `tripMinutes`, from a start time; `minutesLate` = arrival − deadline, rounded (negative = minutes to spare). Traffic is what is active now.
+
+  ```ts
+  forecasts: { jobId, driverId, arrivalAt, minutesLate }[]       // held, uncollected Jobs, from `now`
+  disruptions: {                                                  // one per Placement with trigger 'disruption'
+    placementId, jobId, driverId /* who reported */, reason: string | null, reportedAt /* queuedAt */,
+    status: PlacementStatus,
+    before: { driverId, arrivalAt: string | null, minutesLate: number | null },        // reporter, from reportedAt
+    after: { driverId, arrivalAt: string | null, minutesLate: number | null } | null,  // accepter, from endedAt; null unless Placed
+    endedAt: string | null, secondsToFix: number | null,          // reportedAt → Placed; null unless Placed
+  }[]
+  disruptionTally: { fixed, escalated, open, averageSecondsToFix: number | null }
+  ```
+- `transcript`: `{ callId, kind: CallKind | 'inbound', driverId, role: 'agent' | 'user', text, at, utteranceId? }`. The dashboard upserts lines by `utteranceId` (Retell revises a line as speech continues) and appends when it is absent.
 - `heartbeat`: unchanged.

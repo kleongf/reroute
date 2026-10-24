@@ -12,54 +12,121 @@
     <script type="module" src="/dashboard.js"></script>
   </head>
   <body>
-    <header class="topbar">
-      <h1>Reroute</h1>
-      <p class="live">
-        Live feed:
-        <span id="sse-status" data-testid="sse-status" data-state="connecting">connecting</span>
-        &middot; heartbeats <span id="sse-heartbeats" data-testid="sse-heartbeats">0</span>
-      </p>
-      <p class="provenance">simulated positions &middot; fixture ETA</p>
-      <button id="reset" data-testid="reset" type="button">Reset demo</button>
-    </header>
-    <main id="dashboard" data-testid="dashboard" class="grid">
-      <section class="panel map" aria-label="Map">
-        <h2>Map</h2>
-        <div id="map" data-testid="map"></div>
+    <main id="dashboard" data-testid="dashboard" class="stage">
+      <div id="map" data-testid="map" class="stage-map"></div>
+
+      <header class="topbar card">
+        <h1 class="brand">Reroute</h1>
+        <div id="banner" data-testid="banner" class="banner" data-tone="ok">All Jobs on track</div>
+        <div class="timer">
+          <small>Disruption → Placed</small>
+          <span id="fix-timer" data-testid="fix-timer">–:––</span>
+        </div>
+        <div id="tally" data-testid="tally" class="tally">Disruptions fixed: 0</div>
+        <div class="actions">
+          <button id="reset" data-testid="reset" type="button">Reset demo</button>
+          <span id="traffic-buttons" data-testid="traffic-buttons"></span>
+          <button
+            id="urgent-toggle"
+            data-testid="urgent-toggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="urgent-form"
+          >
+            + Urgent Job
+          </button>
+        </div>
+      </header>
+
+      <form id="urgent-form" data-testid="urgent-form" class="urgent-form card" hidden>
+        <label>Label <input name="label" required placeholder="Hospital samples" /></label>
+        <label>Pickup <input name="pickup" required placeholder="SF General Lab" /></label>
+        <label>Drop-off <input name="dropoff" required placeholder="Mission Bay Clinic" /></label>
+        <label>Parcels <input name="parcels" type="number" min="1" value="1" required /></label>
+        <label
+          >Due in (min) <input name="deadlineOffsetMin" type="number" min="1" value="60" required
+        /></label>
+        <label
+          >Tier
+          <select name="tier">
+            <option value="high">High</option>
+            <option value="normal" selected>Normal</option>
+          </select></label
+        >
+        <button type="submit" class="primary">Add Urgent Job</button>
+        <p id="urgent-error" data-testid="urgent-error" class="urgent-error" role="alert"></p>
+        <p class="note">Urgent Job ETAs: fixture ETA (straight line at city speed)</p>
+      </form>
+
+      <section class="card disruptions" aria-label="Disruptions" data-testid="disruption-list">
+        <h2>Disruptions</h2>
+        <div id="disruption-cards"></div>
       </section>
-      <section class="panel" aria-label="Drivers">
-        <h2>Drivers</h2>
-        <table data-testid="drivers-table">
-          <thead>
-            <tr>
-              <th>Driver</th>
-              <th>Phone</th>
-              <th>Free slots</th>
-              <th>Available</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+
+      <section class="card call" aria-label="Live call" data-testid="call-card">
+        <div id="call"></div>
       </section>
-      <section class="panel" aria-label="Jobs">
-        <h2>Jobs</h2>
-        <table data-testid="jobs-table">
-          <thead>
-            <tr>
-              <th>Job</th>
-              <th>Status</th>
-              <th>Driver</th>
-              <th>Parcels</th>
-              <th>Due</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+
+      <section class="card placement" aria-label="Placement" data-testid="placement-panel">
+        <h2>
+          <button
+            id="placement-toggle"
+            class="collapse"
+            type="button"
+            aria-expanded="true"
+            aria-controls="placement-body"
+          >
+            Placement
+          </button>
+        </h2>
+        <div id="placement-body">
+          <div id="placement"><p class="muted">No Placement yet.</p></div>
+          <h3>Placement Queue</h3>
+          <ol id="placement-queue" data-testid="placement-queue">
+            <li class="muted">Queue empty</li>
+          </ol>
+        </div>
       </section>
-      <section class="panel" aria-label="Placement" data-testid="placement-panel">
-        <h2>Placement</h2>
-        <div id="placement">No Placement yet.</div>
+
+      <section class="drawer" id="drawer" aria-label="Jobs and Drivers">
+        <button id="drawer-toggle" data-testid="drawer-toggle" type="button" aria-expanded="false">
+          Jobs · Drivers
+        </button>
+        <div class="drawer-body">
+          <table data-testid="jobs-table">
+            <thead>
+              <tr>
+                <th>Job</th>
+                <th>Status</th>
+                <th>Driver</th>
+                <th>Parcels</th>
+                <th>Due</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <table data-testid="drivers-table">
+            <thead>
+              <tr>
+                <th>Driver</th>
+                <th>Phone</th>
+                <th>Free slots</th>
+                <th>Available</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </section>
+
+      <footer class="strip">
+        <span id="provenance" data-testid="provenance">simulated positions · fixture ETA</span>
+        <span class="live">
+          Live feed:
+          <span id="sse-status" data-testid="sse-status" data-state="connecting">connecting</span>
+          · heartbeats <span id="sse-heartbeats" data-testid="sse-heartbeats">0</span>
+        </span>
+      </footer>
     </main>
   </body>
 </html>

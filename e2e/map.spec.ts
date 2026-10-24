@@ -53,3 +53,45 @@ test('map panel renders a snapshot without duplicating layers', async ({ page })
   await expand.click();
   await expect(root).not.toHaveClass(/map-root--expanded/);
 });
+
+for (const reducedMotion of ['no-preference', 'reduce'] as const) {
+  const name =
+    reducedMotion === 'reduce' ? 'stays put with reduced motion' : 'moves toward its Pickup';
+  test(`assigned Driver marker ${name}`, async ({ page }) => {
+    await page.emulateMedia({ reducedMotion });
+    await page.goto('/');
+    await page.addStyleTag({ url: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css' });
+    await page.addStyleTag({ url: '/map.css' });
+    await page.addScriptTag({ url: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js' });
+    await page.addScriptTag({
+      type: 'module',
+      content: `
+        import { initMap } from '/map.js';
+        const host = document.createElement('div');
+        host.id = 'map-under-test';
+        host.style.cssText = 'width:800px;height:500px';
+        document.body.prepend(host);
+        initMap(host).render(${JSON.stringify(snapshot)});
+        host.dataset.ready = 'true';
+      `,
+    });
+    const root = page.locator('#map-under-test[data-ready=true]');
+    await expect(root).toHaveCount(1);
+
+    const casey = root.locator('[data-driver-id=casey]'); // holds J18
+    const blair = root.locator('[data-driver-id=blair]'); // no Job
+    const before = { casey: await casey.boundingBox(), blair: await blair.boundingBox() };
+    await page.waitForTimeout(1000);
+    const after = { casey: await casey.boundingBox(), blair: await blair.boundingBox() };
+
+    expect(after.blair).toEqual(before.blair);
+    const provenance = root.getByTestId('map-provenance');
+    if (reducedMotion === 'reduce') {
+      expect(after.casey).toEqual(before.casey);
+      await expect(provenance).not.toContainText('simulated movement');
+    } else {
+      expect(after.casey).not.toEqual(before.casey);
+      await expect(provenance).toContainText('simulated movement');
+    }
+  });
+}

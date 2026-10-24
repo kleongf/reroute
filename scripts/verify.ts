@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { getFreePort, startApp, type RunningApp } from './lib/app-process.ts';
+import { getFreePort, startApp, TEST_SERVER_ENV, type RunningApp } from './lib/app-process.ts';
 
 type Status = 'PASS' | 'FAIL' | 'SKIP';
 
@@ -71,7 +71,7 @@ const steps: readonly Step[] = [
       app = await startApp({
         nodeArgs: ['dist/server.js'],
         port,
-        env: { DATABASE_PATH: join(dbDir, 'verify.db'), HEARTBEAT_MS: '500' },
+        env: { ...TEST_SERVER_ENV, DATABASE_PATH: join(dbDir, 'verify.db'), HEARTBEAT_MS: '500' },
         logFile: SERVER_LOG,
       });
       console.log(`  app healthy at ${app.baseUrl}`);

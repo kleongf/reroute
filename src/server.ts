@@ -7,6 +7,8 @@ import { openDatabase } from './db.ts';
 import { systemClock } from './domain/clock.ts';
 import { log } from './log.ts';
 import { createEngine } from './placement/engine.ts';
+import { createOsrmRouting } from './routing/osrm.ts';
+import { attachRoutedEtas } from './routing/refresh.ts';
 import { loadScenario, readScenarioFile } from './store/scenario.ts';
 import { createStore } from './store/store.ts';
 import { createFakeVoice } from './voice/port.ts';
@@ -24,6 +26,10 @@ const publicDir = fileURLToPath(new URL('../public/', import.meta.url));
 const scenario = readScenarioFile(fileURLToPath(new URL('../fixtures/demo.json', import.meta.url)));
 const phones = process.env;
 const store = createStore(db, loadScenario(scenario, systemClock.now(), phones));
+// ROUTING=osrm: routed ETAs replace fixture ones in the background after each reset / Urgent Job.
+if (config.ROUTING === 'osrm') {
+  attachRoutedEtas(store, createOsrmRouting({ timeoutMs: config.ROUTING_TIMEOUT_MS }));
+}
 // Replaced by the Retell implementation in #6.
 const voice = createFakeVoice();
 const engine = createEngine({
@@ -31,6 +37,7 @@ const engine = createEngine({
   clock: systemClock,
   voice,
   dispatcherPhone: process.env['DISPATCHER_PHONE'] ?? null,
+  simulatedOfferMs: config.SIMULATED_OFFER_MS,
 });
 
 const app = createApp({
