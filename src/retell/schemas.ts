@@ -1,16 +1,40 @@
 import { z } from 'zod';
 
-/**
- * Minimal envelope for Retell webhook deliveries. Placeholder: confirm field names against
- * the Retell docs before relying on anything beyond `event` and `call.call_id`.
- * Unknown fields are kept (looseObject) so the raw payload can be logged for inspection.
- * TODO: verify the Retell signature header before trusting the body.
- */
-export const retellWebhookSchema = z.object({
-  event: z.string().min(1),
-  call: z.looseObject({
-    call_id: z.string().min(1),
+const utteranceSchema = z.looseObject({
+  role: z.enum(['agent', 'user']),
+  content: z.string(),
+  words: z
+    .array(z.looseObject({ start: z.number(), end: z.number(), word: z.string() }))
+    .optional(),
+});
+const transcriptEntrySchema = z.union([
+  utteranceSchema,
+  z.looseObject({
+    role: z.enum(['tool_call_invocation', 'tool_call_result']),
+    tool_call_id: z.string().optional(),
   }),
+]);
+
+/** Extra Retell metadata is retained; every consumed field is validated. */
+export const retellCallSchema = z.looseObject({
+  call_id: z.string().min(1),
+  from_number: z.string().optional(),
+  to_number: z.string().optional(),
+  direction: z.enum(['inbound', 'outbound']).optional(),
+  retell_llm_dynamic_variables: z.record(z.string(), z.string()).optional(),
+  transcript_object: z.array(utteranceSchema).optional(),
+  transcript_with_tool_calls: z.array(transcriptEntrySchema).optional(),
 });
 
+export const retellWebhookSchema = z.looseObject({
+  event: z.string().min(1),
+  call: retellCallSchema,
+  transcript_with_tool_calls: z.array(transcriptEntrySchema).optional(),
+});
+export const retellToolSchema = z.looseObject({
+  name: z.string().min(1).optional(),
+  call: retellCallSchema,
+  args: z.record(z.string(), z.unknown()).default({}),
+});
+export type RetellCall = z.infer<typeof retellCallSchema>;
 export type RetellWebhook = z.infer<typeof retellWebhookSchema>;

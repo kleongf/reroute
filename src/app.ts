@@ -4,6 +4,11 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { Clock } from './domain/clock.ts';
 import type { Engine } from './placement/engine.ts';
+import { createTranscriptBus } from './events/transcripts.ts';
+import { retellAuthentication } from './retell/auth.ts';
+import { retellCallContext } from './retell/context.ts';
+import { handleRetellEvent, type CallEventEngine } from './retell/events.ts';
+import { retellIdempotency } from './retell/idempotency.ts';
 import { retellWebhookSchema } from './retell/schemas.ts';
 import { registerTools } from './retell/tools.ts';
 import { loadScenario, type PhoneBook, type Scenario } from './store/scenario.ts';
@@ -20,11 +25,22 @@ export interface AppDeps {
   readonly scenario: Scenario;
   readonly phones: PhoneBook;
   readonly voice: VoicePort;
-  readonly engine: Engine;
+  readonly engine: Engine & CallEventEngine;
+  readonly retellApiKey?: string;
 }
 
 export function createApp(deps: AppDeps): Hono {
   const app = new Hono();
+  const transcripts = createTranscriptBus();
+  if (deps.retellApiKey) {
+    app.use(
+      '/tools/:name',
+      retellAuthentication(deps.retellApiKey, deps.clock),
+      retellCallContext(deps.store),
+      retellIdempotency(deps.db),
+    );
+    app.use('/webhooks/retell', retellAuthentication(deps.retellApiKey, deps.clock));
+  }
 
   app.get('/health', (c) => {
     const row = deps.db.prepare('SELECT 1 AS ok').get();
@@ -44,9 +60,14 @@ export function createApp(deps: AppDeps): Hono {
       const sendState = () => send('state', toSnapshot(deps.store.get(), deps.clock.now()));
       const unsubscribe = deps.store.subscribe(() => void sendState());
       stream.onAbort(unsubscribe);
+      const unsubscribeTranscript = transcripts.subscribe(
+        (entry) => void send('transcript', entry),
+      );
+      stream.onAbort(unsubscribeTranscript);
 
       await send('hello', { time: deps.clock.now().toISOString() });
       await sendState();
+      for (const entry of transcripts.entries()) await send('transcript', entry);
       while (!stream.aborted && !stream.closed) {
         await send('heartbeat', { time: deps.clock.now().toISOString() });
         await stream.sleep(deps.heartbeatMs);
@@ -57,6 +78,7 @@ export function createApp(deps: AppDeps): Hono {
   app.get('/api/state', (c) => c.json(toSnapshot(deps.store.get(), deps.clock.now())));
 
   app.post('/api/reset', (c) => {
+    transcripts.clear();
     deps.store.replace(loadScenario(deps.scenario, deps.clock.now(), deps.phones));
     return c.json(toSnapshot(deps.store.get(), deps.clock.now()));
   });
@@ -79,6 +101,12 @@ export function createApp(deps: AppDeps): Hono {
         'INSERT INTO webhook_events (received_at, source, event, payload) VALUES (?, ?, ?, ?)',
       )
       .run(deps.clock.now().toISOString(), 'retell', parsed.data.event, JSON.stringify(body));
+    await handleRetellEvent(parsed.data, {
+      store: deps.store,
+      clock: deps.clock,
+      engine: deps.engine,
+      transcripts,
+    });
     return c.body(null, 204);
   });
 
