@@ -1,0 +1,86 @@
+.map-root {
+  position: relative;
+  min-height: 360px;
+  padding: 0;
+}
+
+.map-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.map-root--expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  min-height: 0;
+}
+
+.map-expand,
+.map-provenance {
+  position: absolute;
+  z-index: 1001;
+  font:
+    12px/1.2 system-ui,
+    sans-serif;
+  background: rgb(255 255 255 / 90%);
+  color: #1d3557;
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+
+.map-expand {
+  top: 8px;
+  right: 8px;
+  border: 1px solid #1d3557;
+  cursor: pointer;
+}
+
+.map-provenance {
+  bottom: 20px;
+  left: 8px;
+  font-style: italic;
+}
+
+.map-marker {
+  position: relative;
+}
+
+.map-marker__dot {
+  position: absolute;
+  left: -7px;
+  top: -7px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 2px rgb(0 0 0 / 60%);
+}
+
+.map-marker--driver .map-marker__dot {
+  background: #1d3557;
+}
+
+.map-marker--pickup .map-marker__dot {
+  background: #2a9d8f;
+  border-radius: 2px;
+}
+
+.map-marker--dropoff .map-marker__dot {
+  background: #f4a261;
+  border-radius: 2px;
+}
+
+.map-marker__label {
+  position: absolute;
+  left: 10px;
+  top: -8px;
+  white-space: nowrap;
+  font:
+    600 11px/1 system-ui,
+    sans-serif;
+  color: #1d3557;
+  text-shadow:
+    0 0 3px #fff,
+    0 0 3px #fff;
+}

@@ -1,0 +1,211 @@
+{
+  "now": "2026-10-24T12:00:00.000Z",
+  "resetAt": "2026-10-24T12:00:00.000Z",
+  "drivers": [
+    {
+      "id": "alex",
+      "name": "Alex",
+      "phone": null,
+      "simulated": false,
+      "position": {
+        "lat": 37.7599,
+        "lng": -122.4148
+      },
+      "capacity": 2,
+      "availableFrom": "2026-10-24T09:00:00.000Z",
+      "availableUntil": "2026-10-24T17:00:00.000Z",
+      "version": 1
+    },
+    {
+      "id": "blair",
+      "name": "Blair",
+      "phone": null,
+      "simulated": true,
+      "position": {
+        "lat": 37.7726,
+        "lng": -122.4312
+      },
+      "capacity": 2,
+      "availableFrom": "2026-10-24T09:00:00.000Z",
+      "availableUntil": "2026-10-24T17:00:00.000Z",
+      "version": 1
+    },
+    {
+      "id": "casey",
+      "name": "Casey",
+      "phone": null,
+      "simulated": false,
+      "position": {
+        "lat": 37.7793,
+        "lng": -122.4192
+      },
+      "capacity": 3,
+      "availableFrom": "2026-10-24T09:00:00.000Z",
+      "availableUntil": "2026-10-24T17:00:00.000Z",
+      "version": 1
+    },
+    {
+      "id": "dana",
+      "name": "Dana",
+      "phone": null,
+      "simulated": false,
+      "position": {
+        "lat": 37.7648,
+        "lng": -122.4632
+      },
+      "capacity": 4,
+      "availableFrom": "2026-10-24T08:00:00.000Z",
+      "availableUntil": "2026-10-24T12:20:00.000Z",
+      "version": 1
+    },
+    {
+      "id": "eli",
+      "name": "Eli",
+      "phone": null,
+      "simulated": false,
+      "position": {
+        "lat": 37.7935,
+        "lng": -122.3965
+      },
+      "capacity": 0,
+      "availableFrom": "2026-10-24T09:00:00.000Z",
+      "availableUntil": "2026-10-24T17:00:00.000Z",
+      "version": 1
+    },
+    {
+      "id": "fran",
+      "name": "Fran",
+      "phone": null,
+      "simulated": false,
+      "position": {
+        "lat": 37.7281,
+        "lng": -122.4769
+      },
+      "capacity": 3,
+      "availableFrom": "2026-10-24T09:00:00.000Z",
+      "availableUntil": "2026-10-24T17:00:00.000Z",
+      "version": 1
+    }
+  ],
+  "jobs": [
+    {
+      "id": "J17",
+      "label": "Oak Street pickup",
+      "pickup": {
+        "name": "Oak Street Florist",
+        "lat": 37.7745,
+        "lng": -122.4264
+      },
+      "dropoff": {
+        "name": "Mission Bay Clinic",
+        "lat": 37.7684,
+        "lng": -122.3912
+      },
+      "parcels": 2,
+      "deadline": "2026-10-24T13:00:00.000Z",
+      "serviceMinutes": 3,
+      "tripMinutes": 15,
+      "driverId": "alex",
+      "collected": false,
+      "status": "late",
+      "note": null,
+      "version": 1
+    },
+    {
+      "id": "J18",
+      "label": "Valencia Street pickup",
+      "pickup": {
+        "name": "Valencia Books",
+        "lat": 37.7635,
+        "lng": -122.4216
+      },
+      "dropoff": {
+        "name": "Potrero Hill Office",
+        "lat": 37.7587,
+        "lng": -122.4009
+      },
+      "parcels": 1,
+      "deadline": "2026-10-24T13:30:00.000Z",
+      "serviceMinutes": 3,
+      "tripMinutes": 10,
+      "driverId": "casey",
+      "collected": false,
+      "status": "assigned",
+      "note": null,
+      "version": 1
+    },
+    {
+      "id": "J19",
+      "label": "Embarcadero pickup",
+      "pickup": {
+        "name": "Ferry Building Market",
+        "lat": 37.7955,
+        "lng": -122.3937
+      },
+      "dropoff": {
+        "name": "North Beach Cafe",
+        "lat": 37.8003,
+        "lng": -122.4101
+      },
+      "parcels": 3,
+      "deadline": "2026-10-24T13:15:00.000Z",
+      "serviceMinutes": 3,
+      "tripMinutes": 12,
+      "driverId": "eli",
+      "collected": false,
+      "status": "assigned",
+      "note": null,
+      "version": 1
+    }
+  ],
+  "placements": [
+    {
+      "id": "P1",
+      "jobId": "J17",
+      "trigger": "disruption",
+      "tier": "high",
+      "queuedAt": "2026-10-24T12:00:00.000Z",
+      "status": "running",
+      "previousDriverId": "alex",
+      "startedAt": "2026-10-24T12:00:00.000Z",
+      "endedAt": null,
+      "evaluation": null,
+      "offers": [
+        {
+          "id": "O1",
+          "placementId": "P1",
+          "driverId": "blair",
+          "status": "pending",
+          "declineReason": null,
+          "simulated": true,
+          "createdAt": "2026-10-24T12:00:00.000Z",
+          "resolvedAt": null,
+          "callId": null
+        }
+      ]
+    }
+  ],
+  "queue": [],
+  "activeTraffic": [
+    {
+      "id": "i280",
+      "label": "I-280 closed",
+      "path": [
+        [37.7334, -122.4062],
+        [37.7489, -122.4031],
+        [37.7612, -122.4058],
+        [37.7699, -122.4011]
+      ],
+      "addedMinutes": {
+        "alex": 40
+      }
+    }
+  ],
+  "trafficEvents": [
+    {
+      "id": "i280",
+      "label": "I-280 closed"
+    }
+  ],
+  "log": []
+}
