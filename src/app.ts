@@ -3,6 +3,7 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { Clock } from './domain/clock.ts';
+import { registerNextApp } from './next-app.ts';
 import type { Engine } from './placement/engine.ts';
 import { registerUrgentJobs } from './placement/urgent-route.ts';
 import { retellWebhookSchema } from './retell/schemas.ts';
@@ -17,6 +18,8 @@ export interface AppDeps {
   readonly heartbeatMs: number;
   /** Directory holding the dashboard's static files. */
   readonly publicDir: string;
+  /** Directory holding the web/ build served at /next; omitted = no /next. */
+  readonly webDir?: string;
   readonly store: Store;
   readonly scenario: Scenario;
   readonly phones: PhoneBook;
@@ -95,6 +98,7 @@ export function createApp(deps: AppDeps): Hono {
     return c.body(null, 204);
   });
 
+  if (deps.webDir !== undefined) registerNextApp(app, deps.webDir);
   app.use('/*', serveStatic({ root: deps.publicDir }));
 
   return app;
