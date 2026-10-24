@@ -181,6 +181,7 @@ export function createEngine({ store, clock, voice }: EngineDeps): Engine {
           previousDriverId: driverId,
           startedAt: null,
           endedAt: null,
+          reason,
         });
         const driverName = w.drivers.find((d) => d.id === driverId)?.name ?? driverId;
         log(w, `Disruption: ${driverName} on ${job.id} (${reason}); Job Late`);

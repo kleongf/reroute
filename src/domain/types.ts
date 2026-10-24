@@ -61,6 +61,8 @@ export interface Placement {
   previousDriverId: DriverId | null;
   startedAt: string | null;
   endedAt: string | null;
+  /** Disruption Placements: the Driver's stated reason, kept after the Job note is cleared. */
+  reason?: string;
 }
 
 export type OfferStatus = 'pending' | 'accepted' | 'declined' | 'unanswered';
@@ -128,6 +130,51 @@ export interface World {
   log: LogEntry[];
 }
 
+/** Estimated delivery of a held Job by its current Driver, from fixture ETAs + active traffic. */
+export interface JobForecast {
+  jobId: JobId;
+  driverId: DriverId;
+  arrivalAt: string;
+  /** Positive = minutes past the deadline; negative = minutes to spare. */
+  minutesLate: number;
+}
+
+/** One Driver's estimated delivery of a Job, derived at a given moment. */
+export interface DeliveryEstimate {
+  driverId: DriverId;
+  /** null when the fixture has no ETA for this Driver and Job. */
+  arrivalAt: string | null;
+  /** Positive = minutes past the deadline; negative = minutes to spare. */
+  minutesLate: number | null;
+}
+
+/** A Disruption and how Reroute resolved it; derived from its Placement. */
+export interface DisruptionSummary {
+  placementId: PlacementId;
+  jobId: JobId;
+  /** The Driver who reported it. */
+  driverId: DriverId;
+  reason: string | null;
+  reportedAt: string;
+  status: PlacementStatus;
+  /** The reporting Driver's estimate, as of the report. */
+  before: DeliveryEstimate;
+  /** The accepting Driver's estimate, as of the Placement; null until Placed. */
+  after: DeliveryEstimate | null;
+  /** Placed or Escalated time. */
+  endedAt: string | null;
+  /** Seconds from the report to Placed; null unless Placed. */
+  secondsToFix: number | null;
+}
+
+export interface DisruptionTally {
+  fixed: number;
+  escalated: number;
+  open: number;
+  /** Mean seconds from Disruption to Placed over fixed ones; null if none. */
+  averageSecondsToFix: number | null;
+}
+
 /** What the dashboard receives as the `state` SSE event. */
 export interface StateSnapshot {
   now: string;
@@ -139,4 +186,7 @@ export interface StateSnapshot {
   activeTraffic: TrafficEvent[];
   trafficEvents: { id: string; label: string }[];
   log: LogEntry[];
+  forecasts: JobForecast[];
+  disruptions: DisruptionSummary[];
+  disruptionTally: DisruptionTally;
 }
