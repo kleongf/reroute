@@ -8,6 +8,7 @@ import { systemClock } from './domain/clock.ts';
 import { log } from './log.ts';
 import { createEngine } from './placement/engine.ts';
 import { createOsrmRouting } from './routing/osrm.ts';
+import { createTomTomRouting } from './routing/tomtom.ts';
 import { attachRoutedEtas } from './routing/refresh.ts';
 import { loadScenario, readScenarioFile } from './store/scenario.ts';
 import { createStore } from './store/store.ts';
@@ -31,6 +32,18 @@ const store = createStore(db, loadScenario(scenario, systemClock.now(), phones))
 // ROUTING=osrm: routed ETAs replace fixture ones in the background after each reset / Urgent Job.
 if (config.ROUTING === 'osrm') {
   attachRoutedEtas(store, createOsrmRouting({ timeoutMs: config.ROUTING_TIMEOUT_MS }));
+}
+// ROUTING=tomtom: same, but live-traffic ETAs (source 'traffic') from one TomTom matrix request.
+if (config.ROUTING === 'tomtom') {
+  if (!config.TOMTOM_API_KEY) throw new Error('ROUTING=tomtom needs TOMTOM_API_KEY');
+  attachRoutedEtas(
+    store,
+    createTomTomRouting({
+      apiKey: config.TOMTOM_API_KEY,
+      // TomTom's synchronous matrix is slower than OSRM: default 2 s unless set explicitly.
+      timeoutMs: process.env['ROUTING_TIMEOUT_MS'] ? config.ROUTING_TIMEOUT_MS : 2_000,
+    }),
+  );
 }
 // Replaced by the Retell implementation in #6.
 const voice = createFakeVoice();

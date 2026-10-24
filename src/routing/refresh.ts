@@ -12,7 +12,7 @@ export interface RoutedEtas {
 /**
  * Keeps the ETA table routed: whenever the World gains a Driver × Job pair not yet routed since
  * the last reset (a reset, an Urgent Job), asks `routing` for those pairs in the background and
- * writes the answers into the ETA table with source 'routed'. Never blocks a command; on any
+ * writes the answers into the ETA table with source `routing.source` ('routed' by default). Never blocks a command; on any
  * error or timeout the fixture / straight-line value stays (source 'fixture').
  */
 export function attachRoutedEtas(store: Store, routing: RoutingPort): RoutedEtas {
@@ -59,7 +59,7 @@ export function attachRoutedEtas(store: Store, routing: RoutingPort): RoutedEtas
           const minutes = grid[i]?.[k];
           if (typeof minutes !== 'number' || !draft.jobs.some((x) => x.id === j.id)) return;
           (draft.etaMinutes[d.id] ??= {})[j.id] = minutes;
-          ((draft.etaSource ??= {})[d.id] ??= {})[j.id] = 'routed';
+          ((draft.etaSource ??= {})[d.id] ??= {})[j.id] = routing.source ?? 'routed';
           routed += 1;
         });
       });

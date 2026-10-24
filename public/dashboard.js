@@ -566,13 +566,17 @@ function offerBadge(o) {
 }
 
 /**
- * "routed ETA" or "fixture ETA" (fixture table, or straight line for Urgent Jobs).
+ * "live traffic ETA", "routed ETA" or "fixture ETA" (fixture table, or straight line for Urgent Jobs).
  * @param {StateSnapshot} s
  * @param {string} driverId
  * @param {string} jobId
  */
 const etaLabel = (s, driverId, jobId) =>
-  s.etas.source[driverId]?.[jobId] === 'routed' ? 'routed ETA' : 'fixture ETA';
+  s.etas.source[driverId]?.[jobId] === 'traffic'
+    ? 'live traffic ETA'
+    : s.etas.source[driverId]?.[jobId] === 'routed'
+      ? 'routed ETA'
+      : 'fixture ETA';
 
 /** @param {Model} m */
 function renderPlacement(m) {
@@ -805,6 +809,7 @@ let vehiclesMoving = false;
 function renderProvenance(s) {
   const sources = new Set(Object.values(s.etas.source).flatMap((row) => Object.values(row)));
   const labels = ['simulated positions'];
+  if (sources.has('traffic')) labels.push('live traffic ETA');
   if (sources.has('routed')) labels.push('routed ETA');
   if (sources.has('fixture') || sources.size === 0) labels.push('fixture ETA');
   if (s.activeTraffic.length > 0) labels.push('simulated traffic');
