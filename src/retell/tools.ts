@@ -1,6 +1,8 @@
 import type { Hono } from 'hono';
 import { z } from 'zod';
-import type { Engine } from '../placement/engine.ts';
+import type { Clock } from '../domain/clock.ts';
+import { parseSpokenTime, spokenTime } from '../domain/time.ts';
+import type { Engine, StatusUpdate } from '../placement/engine.ts';
 import type { Store } from '../store/store.ts';
 
 /** Retell custom-function payload. Loose for now; the real schema lands in #6. */
@@ -23,6 +25,19 @@ const reportDisruptionArgs = z.object({
 
 const acceptOfferArgs = z.object({ offer_id: z.string().min(1).optional() });
 
+/** Optional status fields a Driver can give in `report_status` or alongside a decline. */
+const statusArgs = {
+  capacity: z.number().int().min(0).optional(),
+  available_from: z.string().min(1).optional(),
+  available_until: z.string().min(1).optional(),
+};
+const declineOfferArgs = z.object({
+  offer_id: z.string().min(1).optional(),
+  reason: z.string().optional(),
+  ...statusArgs,
+});
+const reportStatusArgs = z.object(statusArgs);
+
 type ToolCall = z.infer<typeof toolCallSchema>;
 interface ToolOutcome {
   status: 200 | 400;
@@ -31,8 +46,43 @@ interface ToolOutcome {
 
 const invalid = (result: string): ToolOutcome => ({ status: 400, result });
 
+const UNKNOWN_CALLER =
+  "Sorry, I don't recognise this phone number. Please call from the phone the Dispatcher has on file.";
+
+/** Status fields → StatusUpdate; null if a time can't be understood. */
+function toStatusUpdate(
+  args: {
+    capacity?: number | undefined;
+    available_from?: string | undefined;
+    available_until?: string | undefined;
+  },
+  now: Date,
+): StatusUpdate | null {
+  const update: StatusUpdate = {};
+  if (args.capacity !== undefined) update.capacity = args.capacity;
+  for (const [key, field] of [
+    ['available_from', 'availableFrom'],
+    ['available_until', 'availableUntil'],
+  ] as const) {
+    const text = args[key];
+    if (text === undefined) continue;
+    const iso = parseSpokenTime(text, now);
+    if (!iso) return null;
+    update[field] = iso;
+  }
+  return update;
+}
+
 /** Registers `POST /tools/:name`: Retell tool calls answered with a speakable `result`. */
-export function registerTools(app: Hono, deps: { engine: Engine; store: Store }): void {
+export function registerTools(
+  app: Hono,
+  deps: { engine: Engine; store: Store; clock: Clock },
+): void {
+  /** Inbound callers by `call.from_number`; outbound calls carry `driver_id` in vars. */
+  const callerId = (body: ToolCall): string | undefined =>
+    deps.store.get().drivers.find((d) => d.phone && d.phone === body.call.from_number)?.id ??
+    body.call.retell_llm_dynamic_variables?.['driver_id'];
+
   const handlers: Record<string, (call: ToolCall) => Promise<ToolOutcome>> = {
     async report_disruption(body) {
       const args = reportDisruptionArgs.safeParse(body.args);
@@ -61,6 +111,47 @@ export function registerTools(app: Hono, deps: { engine: Engine; store: Store })
       if (!offerId) return invalid("Sorry, I can't tell which offer you're accepting.");
       const r = await deps.engine.acceptOffer(offerId);
       return { status: r.ok ? 200 : 400, result: r.message };
+    },
+
+    async decline_offer(body) {
+      const args = declineOfferArgs.safeParse(body.args);
+      if (!args.success) return invalid("Sorry, I didn't catch that. Can you say it again?");
+      const offerId = args.data.offer_id ?? body.call.retell_llm_dynamic_variables?.['offer_id'];
+      if (!offerId) return invalid("Sorry, I can't tell which offer you're declining.");
+      const update = toStatusUpdate(args.data, deps.clock.now());
+      if (!update) return invalid("Sorry, what time was that? Say it like 'four PM'.");
+      const r = await deps.engine.declineOffer(offerId, args.data.reason ?? null, update);
+      return { status: r.ok ? 200 : 400, result: r.message };
+    },
+
+    async report_status(body) {
+      const driverId = callerId(body);
+      if (!driverId) return invalid(UNKNOWN_CALLER);
+      const args = reportStatusArgs.safeParse(body.args);
+      if (!args.success) return invalid("Sorry, I didn't catch what changed.");
+      const update = toStatusUpdate(args.data, deps.clock.now());
+      if (!update) return invalid("Sorry, what time was that? Say it like 'four PM'.");
+      const r = await deps.engine.reportStatus(driverId, update);
+      return { status: r.ok ? 200 : 400, result: r.message };
+    },
+
+    get_my_jobs(body) {
+      const driverId = callerId(body);
+      if (!driverId) return Promise.resolve(invalid(UNKNOWN_CALLER));
+      const jobs = deps.store
+        .get()
+        .jobs.filter((j) => j.driverId === driverId && j.status !== 'done');
+      if (jobs.length === 0) {
+        return Promise.resolve({ status: 200, result: "You don't have any jobs right now." });
+      }
+      const list = jobs
+        .map(
+          (j) =>
+            `job ${j.id}, the ${j.label}, ${String(j.parcels)} ${j.parcels === 1 ? 'parcel' : 'parcels'}, due by ${spokenTime(j.deadline)}`,
+        )
+        .join('; ');
+      const count = jobs.length === 1 ? 'one job' : `${String(jobs.length)} jobs`;
+      return Promise.resolve({ status: 200, result: `You have ${count}: ${list}.` });
     },
   };
 

@@ -29,17 +29,49 @@ export interface Engine {
     collected: boolean,
   ): Promise<CommandResult>;
   acceptOffer(offerId: OfferId): Promise<CommandResult>;
+  declineOffer(
+    offerId: OfferId,
+    reason?: string | null,
+    statusUpdate?: StatusUpdate,
+  ): Promise<CommandResult>;
+  markUnanswered(offerId: OfferId): Promise<CommandResult>;
+  reportStatus(driverId: DriverId, update: StatusUpdate): Promise<CommandResult>;
 }
+
+/** A Driver's own update to their record; times are ISO. */
+export interface StatusUpdate {
+  capacity?: number;
+  availableFrom?: string;
+  availableUntil?: string;
+}
+
+/** Simulated Offers (Blair) always get this scripted reply. */
+export const SIMULATED_DECLINE = { reason: 'only room for one', update: { capacity: 1 } };
 
 export interface EngineDeps {
   store: Store;
   clock: Clock;
   voice: VoicePort;
   dispatcherPhone: string | null;
+  /** Delay before a simulated Offer resolves itself (SIMULATED_OFFER_MS, default 4000). */
+  simulatedOfferMs?: number;
+  /** Runs `fn` after `ms`; injectable so tests can resolve simulated Offers on demand. */
+  schedule?: (fn: () => Promise<void>, ms: number) => void;
 }
 
+const defaultSchedule = (fn: () => Promise<void>, ms: number) => {
+  setTimeout(() => void fn(), ms);
+};
+
 /** The Placement lifecycle: the only writer of Offers, Placements, and assignments. */
-export function createEngine({ store, clock, voice }: EngineDeps): Engine {
+export function createEngine({
+  store,
+  clock,
+  voice,
+  dispatcherPhone,
+  simulatedOfferMs = 4000,
+  schedule = defaultSchedule,
+}: EngineDeps): Engine {
   const nowIso = () => clock.now().toISOString();
   const log = (w: World, text: string) => w.log.push({ at: nowIso(), text });
 
@@ -96,7 +128,7 @@ export function createEngine({ store, clock, voice }: EngineDeps): Engine {
 
   /** Evaluates the running Placement and offers its Job to the top Eligible Driver. */
   async function makeOffer(placementId: string): Promise<void> {
-    const call = store.update((w) => {
+    const call = store.update((w): OfferStep => {
       const placement = w.placements.find((p) => p.id === placementId);
       const job = placement && w.jobs.find((j) => j.id === placement.jobId);
       if (placement?.status !== 'running' || !job) return null;
@@ -105,11 +137,18 @@ export function createEngine({ store, clock, voice }: EngineDeps): Engine {
       const top = evaluation.eligible[0];
       const driver = top && w.drivers.find((d) => d.id === top.driverId);
       if (!driver) {
-        // TODO(#5): call the Dispatcher with a one-sentence explanation.
         placement.status = 'escalated';
         placement.endedAt = nowIso();
+        // A Late Job keeps its current Driver; only the status changes.
+        job.status = 'escalated';
+        job.version += 1;
         log(w, `No Eligible Driver for ${job.id}; Placement ${placement.id} Escalated`);
-        return null;
+        const tried = w.offers.filter((o) => o.placementId === placement.id).length;
+        return escalate(
+          w,
+          job,
+          `No Driver could take the ${job.label} due by ${spokenTime(job.deadline)}: ${String(tried)} ${tried === 1 ? 'Offer was' : 'Offers were'} declined or unanswered and nobody else is eligible.`,
+        );
       }
       const offerId = `O${String(w.offers.length + 1)}`;
       w.offers.push({
@@ -127,15 +166,25 @@ export function createEngine({ store, clock, voice }: EngineDeps): Engine {
         w,
         `Offer ${offerId}: ${job.id} to ${driver.name}${driver.simulated ? ' (simulated)' : ''}`,
       );
-      // TODO(#5): simulated Offers resolve themselves after SIMULATED_OFFER_MS.
-      if (driver.simulated || driver.phone === null) return null;
+      if (driver.simulated) return { simulatedOfferId: offerId, resetAt: w.resetAt };
+      if (driver.phone === null) return null;
       return {
+        kind: 'offer',
         offerId,
         to: driver.phone,
         vars: { call_kind: 'offer', driver_id: driver.id, offer_id: offerId, ...jobVars(job) },
       };
     });
     if (!call) return;
+    if ('simulatedOfferId' in call) {
+      scheduleSimulatedReply(call.simulatedOfferId, call.resetAt);
+      return;
+    }
+    if (call.kind === 'escalation') {
+      await voice.placeCall(call);
+      await startNext();
+      return;
+    }
     const { callId } = await voice.placeCall({ kind: 'offer', to: call.to, vars: call.vars });
     store.update((w) => {
       const offer = w.offers.find((o) => o.id === call.offerId);
@@ -143,9 +192,128 @@ export function createEngine({ store, clock, voice }: EngineDeps): Engine {
     });
   }
 
-  return {
+  interface EscalationCall {
+    kind: 'escalation';
+    to: string;
+    vars: Record<string, string>;
+  }
+  /** What `makeOffer` does after its transaction. */
+  type OfferStep =
+    | null
+    | EscalationCall
+    | { simulatedOfferId: OfferId; resetAt: string }
+    | { kind: 'offer'; offerId: OfferId; to: string; vars: Record<string, string> };
+  type DisruptionOutcome = CommandResult & {
+    queued?: boolean;
+    escalation?: EscalationCall | null;
+  };
+
+  /** Records an Escalation; returns the Dispatcher call to place, or null with no number. */
+  function escalate(w: World, job: Job, reason: string): EscalationCall | null {
+    log(w, `Escalation: ${reason}`);
+    if (!dispatcherPhone) return null;
+    return {
+      kind: 'escalation',
+      to: dispatcherPhone,
+      vars: { call_kind: 'escalation', reason, ...jobVars(job) },
+    };
+  }
+
+  /** Blair's Offer never reaches VoicePort: it declines itself with the scripted reply. */
+  function scheduleSimulatedReply(offerId: OfferId, resetAt: string): void {
+    schedule(async () => {
+      // A demo reset in between reuses Offer IDs; leave the new World alone.
+      if (store.get().resetAt !== resetAt) return;
+      await engine.declineOffer(offerId, SIMULATED_DECLINE.reason, SIMULATED_DECLINE.update);
+    }, simulatedOfferMs);
+  }
+
+  function applyStatus(driver: Driver, update: StatusUpdate): string[] {
+    const changes: string[] = [];
+    if (update.capacity !== undefined) {
+      driver.capacity = update.capacity;
+      changes.push(`${String(update.capacity)} free ${update.capacity === 1 ? 'slot' : 'slots'}`);
+    }
+    if (update.availableFrom !== undefined) {
+      driver.availableFrom = update.availableFrom;
+      changes.push(`available from ${spokenTime(update.availableFrom)}`);
+    }
+    if (update.availableUntil !== undefined) {
+      driver.availableUntil = update.availableUntil;
+      changes.push(`off at ${spokenTime(update.availableUntil)}`);
+    }
+    if (changes.length > 0) driver.version += 1;
+    return changes;
+  }
+
+  /** Ends a pending Offer as declined or unanswered, then makes the next Offer. */
+  async function resolveOffer(
+    offerId: OfferId,
+    status: 'declined' | 'unanswered',
+    reason: string | null,
+    update: StatusUpdate,
+  ): Promise<CommandResult> {
+    const outcome = store.update((w): CommandResult & { next?: string } => {
+      const offer = w.offers.find((o) => o.id === offerId);
+      if (!offer) return { ok: false, message: "I can't find that offer." };
+      if (offer.status !== 'pending') {
+        return {
+          ok: true,
+          message:
+            offer.status === 'accepted'
+              ? "You're already confirmed for this job."
+              : 'No problem, that offer is closed.',
+        };
+      }
+      const driver = w.drivers.find((d) => d.id === offer.driverId);
+      offer.status = status;
+      offer.declineReason = reason;
+      offer.resolvedAt = nowIso();
+      const changes = driver ? applyStatus(driver, update) : [];
+      const name = driver?.name ?? offer.driverId;
+      const detail = [reason, ...changes].filter(Boolean).join('; ');
+      log(
+        w,
+        status === 'declined'
+          ? `${name} declined Offer ${offer.id}${detail ? ` (${detail})` : ''}`
+          : `Offer ${offer.id} to ${name} Unanswered`,
+      );
+      return {
+        ok: true,
+        next: offer.placementId,
+        message: "No problem, thanks for letting me know. I'll ask someone else.",
+      };
+    });
+    if (outcome.next) await makeOffer(outcome.next);
+    return { ok: outcome.ok, message: outcome.message };
+  }
+
+  const engine: Engine = {
+    declineOffer(offerId, reason, statusUpdate) {
+      return resolveOffer(offerId, 'declined', reason ?? null, statusUpdate ?? {});
+    },
+
+    markUnanswered(offerId) {
+      return resolveOffer(offerId, 'unanswered', null, {});
+    },
+
+    reportStatus(driverId, update) {
+      return Promise.resolve(
+        store.update((w): CommandResult => {
+          const driver = w.drivers.find((d) => d.id === driverId);
+          if (!driver) return { ok: false, message: "Sorry, I can't find your driver record." };
+          const changes = applyStatus(driver, update);
+          if (changes.length === 0) {
+            return { ok: false, message: "Sorry, I didn't catch what changed." };
+          }
+          log(w, `${driver.name} status: ${changes.join(', ')}`);
+          return { ok: true, message: `Got it, I've noted ${changes.join(' and ')}.` };
+        }),
+      );
+    },
+
     async reportDisruption(driverId, jobId, reason, collected) {
-      const outcome = store.update((w): CommandResult & { queued?: boolean } => {
+      const outcome = store.update((w): DisruptionOutcome => {
         const job = w.jobs.find((j) => j.id === jobId);
         if (!job) return { ok: false, message: `I can't find job ${jobId}.` };
         const active = w.placements.find(
@@ -157,13 +325,25 @@ export function createEngine({ store, clock, voice }: EngineDeps): Engine {
         if (job.driverId !== driverId) {
           return { ok: false, message: `Job ${jobId} isn't one of your jobs.` };
         }
+        if (job.status === 'escalated') {
+          return { ok: true, message: "Thanks. I've already asked the Dispatcher to sort it out." };
+        }
         if (collected) {
-          // TODO(#5): escalate to the Dispatcher ("needs a physical handoff").
           job.status = 'escalated';
+          job.collected = true;
           job.note = reason;
           job.version += 1;
           log(w, `Disruption on ${job.id} after Pickup; needs a physical handoff`);
-          return { ok: true, message: "Thanks. I'll get the Dispatcher to arrange a handoff." };
+          const name = w.drivers.find((d) => d.id === driverId)?.name ?? driverId;
+          return {
+            ok: true,
+            escalation: escalate(
+              w,
+              job,
+              `${name} can't finish the ${job.label} (${reason}) and already has the parcels, so it needs a physical handoff.`,
+            ),
+            message: "Thanks. I'll get the Dispatcher to arrange a handoff.",
+          };
         }
         job.status = 'late';
         job.note = reason;
@@ -188,6 +368,7 @@ export function createEngine({ store, clock, voice }: EngineDeps): Engine {
           message: "Keep going; I'll call you if someone takes it over.",
         };
       });
+      if (outcome.escalation) await voice.placeCall(outcome.escalation);
       if (outcome.queued) await startNext();
       return { ok: outcome.ok, message: outcome.message };
     },
@@ -273,4 +454,5 @@ export function createEngine({ store, clock, voice }: EngineDeps): Engine {
       return { ok: outcome.ok, message: outcome.message };
     },
   };
+  return engine;
 }

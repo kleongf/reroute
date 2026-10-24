@@ -125,7 +125,7 @@ requireElement('reset').addEventListener('click', () => {
 // ---- Placement panel (#4): self-contained; renders the latest Placement from `state`. ----
 
 /**
- * @typedef {{ id: string; driverId: string; status: string; simulated: boolean }} OfferView
+ * @typedef {{ id: string; driverId: string; status: string; simulated: boolean; declineReason: string | null }} OfferView
  * @typedef {{ driverId: string; etaToPickupMinutes: number }} EligibleView
  * @typedef {{ driverId: string; reason: { kind: string; text: string } }} IneligibleView
  * @typedef {{
@@ -189,8 +189,9 @@ function renderPlacement(snapshot) {
   const offers = el('ul', '', { testid: 'offer-list' });
   for (const o of placement.offers) {
     const sim = o.simulated ? ' (simulated Offer)' : '';
+    const why = o.declineReason ? ` (“${o.declineReason}”)` : '';
     offers.append(
-      el('li', `Offer to ${nameOf(o.driverId)}${sim}: ${o.status}`, { status: o.status }),
+      el('li', `Offer to ${nameOf(o.driverId)}${sim}: ${o.status}${why}`, { status: o.status }),
     );
   }
   if (offers.children.length === 0) offers.append(el('li', 'No Offers yet'));

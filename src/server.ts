@@ -31,6 +31,7 @@ const engine = createEngine({
   clock: systemClock,
   voice,
   dispatcherPhone: process.env['DISPATCHER_PHONE'] ?? null,
+  simulatedOfferMs: config.SIMULATED_OFFER_MS,
 });
 
 const app = createApp({
