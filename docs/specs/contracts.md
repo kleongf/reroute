@@ -150,6 +150,8 @@ All are idempotent: re-sending one whose effect already happened returns the cur
 
 Tool names: `get_my_jobs`, `report_disruption`, `confirm_on_track`, `report_status`, `accept_offer`, `decline_offer`. Inbound callers are identified by `call.from_number`; outbound calls carry `driver_id` in vars.
 
+Status fields, shared by `report_status` and `decline_offer`: `capacity?` (int ≥ 0), `available_from?`, `available_until?` (ISO, or spoken "4 PM" / "16:30" / bare "4" = next 4 o'clock, demo time zone). `decline_offer` also takes `offer_id?` (else vars) and `reason?`. Escalation calls carry `reason` (one sentence) plus the Job vars.
+
 ## SSE
 
 - `state`: the full snapshot, sent on connect and after every engine command. The dashboard re-renders from it; no client-side state merging.

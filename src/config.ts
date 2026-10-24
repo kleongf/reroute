@@ -4,6 +4,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().min(0).max(65_535).default(3000),
   DATABASE_PATH: z.string().min(1).default('reroute.db'),
   HEARTBEAT_MS: z.coerce.number().int().positive().default(15_000),
+  SIMULATED_OFFER_MS: z.coerce.number().int().min(0).default(4_000),
 });
 
 export type Config = z.infer<typeof envSchema>;
