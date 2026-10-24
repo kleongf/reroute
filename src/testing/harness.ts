@@ -30,6 +30,8 @@ export interface Harness {
   state(): Promise<StateSnapshot>;
   /** POST JSON to `path`; returns status and parsed body (null if empty). */
   post(path: string, body?: unknown): Promise<{ status: number; body: unknown }>;
+  /** Runs deferred work (simulated Offer replies) until none is left; returns how many ran. */
+  runScheduled(): Promise<number>;
   close(): void;
 }
 
@@ -48,11 +50,14 @@ export function createHarness(phones: PhoneBook = HARNESS_PHONES): Harness {
   const store = createStore(db, loadScenario(scenario, clock.now(), phones));
   const publicDir = mkdtempSync(join(tmpdir(), 'reroute-public-'));
   writeFileSync(join(publicDir, 'index.html'), '<h1>Reroute</h1>');
+  const scheduled: (() => Promise<void>)[] = [];
   const engine = createEngine({
     store,
     clock,
     voice,
     dispatcherPhone: phones['DISPATCHER_PHONE'] ?? null,
+    simulatedOfferMs: 0,
+    schedule: (fn) => scheduled.push(fn),
   });
   const app = createApp({
     db,
@@ -84,6 +89,14 @@ export function createHarness(phones: PhoneBook = HARNESS_PHONES): Harness {
       });
       const text = await res.text();
       return { status: res.status, body: text === '' ? null : (JSON.parse(text) as unknown) };
+    },
+    async runScheduled() {
+      let ran = 0;
+      while (scheduled.length > 0) {
+        await scheduled.shift()?.();
+        ran += 1;
+      }
+      return ran;
     },
     close() {
       db.close();

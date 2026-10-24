@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { Clock } from './domain/clock.ts';
 import type { Engine } from './placement/engine.ts';
+import { registerUrgentJobs } from './placement/urgent-route.ts';
 import { retellWebhookSchema } from './retell/schemas.ts';
 import { registerTools } from './retell/tools.ts';
 import { loadScenario, type PhoneBook, type Scenario } from './store/scenario.ts';
@@ -67,7 +68,8 @@ export function createApp(deps: AppDeps): Hono {
     return c.json(toSnapshot(deps.store.get(), deps.clock.now()));
   });
 
-  registerTools(app, { engine: deps.engine, store: deps.store });
+  registerTools(app, { engine: deps.engine, store: deps.store, clock: deps.clock });
+  registerUrgentJobs(app, { engine: deps.engine, store: deps.store, clock: deps.clock });
 
   app.post('/webhooks/retell', async (c) => {
     let body: unknown;
@@ -85,6 +87,11 @@ export function createApp(deps: AppDeps): Hono {
         'INSERT INTO webhook_events (received_at, source, event, payload) VALUES (?, ?, ?, ?)',
       )
       .run(deps.clock.now().toISOString(), 'retell', parsed.data.event, JSON.stringify(body));
+    if (parsed.data.event === 'call_ended') {
+      // Ended with its Offer still pending → Unanswered; after accept/decline it changes nothing.
+      const offer = deps.store.get().offers.find((o) => o.callId === parsed.data.call.call_id);
+      if (offer?.status === 'pending') await deps.engine.markUnanswered(offer.id);
+    }
     return c.body(null, 204);
   });
 
