@@ -145,7 +145,7 @@ All are idempotent: re-sending one whose effect already happened returns the cur
 | `POST /webhooks/retell` | Retell call events | `call_ended` → `markUnanswered`; `transcript_updated` → `transcript` SSE |
 | `POST /api/reset` | — | |
 | `POST /api/traffic/:id` | — | `injectTraffic`; returns the snapshot; unknown id → 404 |
-| `POST /api/jobs` | `{ label, pickup, dropoff, parcels, deadlineOffsetMin, tier }` | |
+| `POST /api/jobs` | `{ label, pickup, dropoff, parcels, deadlineOffsetMin, tier }` | `pickup`/`dropoff` are `{ name, lat?, lng? }` (default: central SF). 201 `{ ok, message, jobId, state }`; 400 `{ error, message }`. Urgent Job ETAs: straight line at 20 km/h, rounded up, stored in the ETA table |
 | `GET /events` | — | SSE |
 
 Tool names: `get_my_jobs`, `report_disruption`, `confirm_on_track`, `report_status`, `accept_offer`, `decline_offer`. Inbound callers are identified by `call.from_number`; outbound calls carry `driver_id` in vars.
