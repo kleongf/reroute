@@ -123,6 +123,15 @@ Vars always include `call_kind`, plus `job_id`, `job_label`, `pickup_name`, `dea
 
 ## Engine commands
 
+Offers persist the Job and Driver versions at creation (`jobVersion`, `driverVersion`)
+for the acceptance recheck. Placements persist `priorityDeadline` when queued so their
+Priority cannot change later. These fields are optional when reading older snapshots.
+Tool arguments use snake_case IDs; status updates use `capacity`, `availableFrom`, and
+`availableUntil`. The call's `retell_llm_dynamic_variables` carry the outbound context.
+The offline app uses FakeVoice only; signature verification and real Retell remain #6.
+Urgent Jobs use the fixture travel profile nearest their Pickup (labelled fixture ETA),
+with service and trip minutes from that same profile until routing is implemented.
+
 All are idempotent: re-sending one whose effect already happened returns the current state and changes nothing.
 
 | Command | From | Effect |
