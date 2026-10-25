@@ -78,13 +78,13 @@ describe('Urgent Jobs and the Placement Queue', () => {
   });
 
   it('uses given Pickup coordinates for ETAs', async () => {
-    // Out at Stonestown (Fran's corner, but Fran has no phone): Alex is now nearest callable.
+    // Out at Stonestown: Blair is nearest Eligible, since Alex is now near Cesar Chavez.
     await h.post(
       '/api/jobs',
       urgent({ pickup: { name: 'Stonestown dock', lat: 37.7281, lng: -122.4769 } }),
     );
     const eligible = placementFor(await h.state(), 'U1').evaluation?.eligible ?? [];
-    expect(eligible[0]).toEqual({ driverId: 'alex', etaToPickupMinutes: 20 });
+    expect(eligible[0]).toEqual({ driverId: 'blair', etaToPickupMinutes: 20 });
   });
 
   it('queues by tier, then deadline, then queued time; arrivals never touch the running Offer', async () => {

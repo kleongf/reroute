@@ -15,7 +15,7 @@ const PADDING_BOTTOM_RIGHT: [number, number] = [380, 50];
 /** "simulated positions · live traffic ETA · …": what on screen is not real. */
 export function provenanceLabel(s: StateSnapshot, moving: boolean): string {
   const sources = new Set(Object.values(s.etas.source).flatMap((row) => Object.values(row)));
-  const labels = ['simulated positions'];
+  const labels = ['simulated positions', 'illustrative connections'];
   if (sources.has('traffic')) labels.push('live traffic ETA');
   if (sources.has('routed')) labels.push('routed ETA');
   if (sources.has('fixture') || sources.size === 0) labels.push('fixture ETA');

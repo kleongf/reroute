@@ -101,7 +101,7 @@ interface Evaluation {
   "jobs": [{ "id": "J17", "label": "Oak Street pickup", "pickup": {…}, "dropoff": {…}, "parcels": 2,
              "deadlineOffsetMin": 60, "serviceMinutes": 3, "tripMinutes": 15, "driverId": "alex" }],
   "etaMinutes": { "alex": { "J17": 50 }, "casey": { "J17": 9 } },   // driver → job → minutes to Pickup
-  "trafficEvents": [{ "id": "i280", "label": "I-280 closed", "path": [[lat, lng], …],
+  "trafficEvents": [{ "id": "us101", "label": "US-101 north closed at Cesar Chavez", "path": [[lat, lng], …],
                       "addedMinutes": { "alex": 40 } }]
 }
 ```
@@ -151,7 +151,7 @@ interface RoutingPort {
 
 `ROUTING=osrm` (default `off`) makes the server call `attachRoutedEtas(store, osrm)`: it watches the store, and whenever a Driver × Job pair appears that has not been routed since the last reset (a reset, an Urgent Job), it asks the public OSRM demo server (`router.project-osrm.org`, driving, one `table` request, timeout `ROUTING_TIMEOUT_MS`, default 1500) in the background and writes the answers (whole minutes, rounded up) into the ETA table. Commands and tool calls never wait for it: their responses carry the fixture / straight-line ETAs until the routed ones land. Any error or timeout keeps the fixture value. Answers that arrive after a newer reset are dropped. Traffic minutes still add on top.
 
-`ROUTING=tomtom` (needs `TOMTOM_API_KEY`) does the same with TomTom Matrix Routing v2 (`POST https://api.tomtom.com/routing/matrix/2`, synchronous, `departAt: "now"`, `traffic: "live"`, car, fastest): one request per batch of new pairs (6 Drivers x 3 Jobs = 18 billed transactions per reset), timeout 2 s unless `ROUTING_TIMEOUT_MS` is set, and its answers carry source `'traffic'`. Each pair is requested once per reset, never polled. The simulated traffic events (e.g. "I-280 closed") still add their minutes on top of these live-traffic ETAs.
+`ROUTING=tomtom` (needs `TOMTOM_API_KEY`) does the same with TomTom Matrix Routing v2 (`POST https://api.tomtom.com/routing/matrix/2`, synchronous, `departAt: "now"`, `traffic: "live"`, car, fastest): one request per batch of new pairs (6 Drivers x 3 Jobs = 18 billed transactions per reset), timeout 2 s unless `ROUTING_TIMEOUT_MS` is set, and its answers carry source `'traffic'`. Each pair is requested once per reset, never polled. The simulated traffic events (e.g. "US-101 north closed at Cesar Chavez") still add their minutes on top of these live-traffic ETAs.
 
 ## HTTP
 
@@ -215,3 +215,19 @@ Offer on `call_ended` (the #5 engine implements that method). Transcript SSE kee
 the existing `{callId,kind,driverId,role,text,at}` shape and adds `utteranceId` so a
 client can replace a revised utterance rather than append duplicates. The partner's
 UI prototype owns rendering these events; this branch does not change its markup.
+
+
+## Revised US-101 demo visuals
+
+`Driver.holdPosition?: boolean` is a visual-only fixture flag: keep the Driver's
+simulated marker at its fixture coordinates while waiting before Pickup. Alex
+uses it so accelerated marker animation cannot show him reaching Oak Street
+before the closure is injected. It never changes eligibility, ETAs, or assignments.
+The `us101` fixture event adds 40 minutes to Alex's approach only; the shared Job
+trip and other Drivers' approaches are unchanged. Blair's scripted simulated
+Offer declines “my van’s full” and updates capacity to 0.
+The dashboard derives without-closure/current ETA comparisons from the same
+snapshot clock and active traffic values. Lines connecting Pickup to drop-off
+and Drivers to Pickup are explicitly illustrative, not road-route geometry.
+Closing progress uses Accepted Offer state; the previous Driver is labelled
+notified only after speech appears in that release call's transcript.

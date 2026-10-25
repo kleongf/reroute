@@ -11,7 +11,7 @@ const tool = (name: string, args: Record<string, unknown>, call: Record<string, 
 
 const disruption = tool(
   'report_disruption',
-  { job_id: 'J17', reason: 'stuck behind the I-280 closure', collected: false },
+  { job_id: 'J17', reason: 'stuck behind the US-101 closure', collected: false },
   { from_number: ALEX_PHONE },
 );
 
@@ -36,21 +36,21 @@ describe('snapshot: Disruption before → after, tally, forecasts', () => {
     expect((await h.state()).forecasts).toContainEqual({
       jobId: 'J17',
       driverId: 'alex',
-      arrivalAt: '2026-10-24T14:28:00.000Z',
-      minutesLate: -32,
+      arrivalAt: '2026-10-24T14:32:00.000Z',
+      minutesLate: -28,
     });
-    await h.post('/api/traffic/i280');
+    await h.post('/api/traffic/us101');
     expect((await h.state()).forecasts).toContainEqual({
       jobId: 'J17',
       driverId: 'alex',
-      arrivalAt: '2026-10-24T15:08:00.000Z',
-      minutesLate: 8,
+      arrivalAt: '2026-10-24T15:12:00.000Z',
+      minutesLate: 12,
     });
   });
 
   it('a Placed Disruption shows before, after, time to fix, and counts in the tally', async () => {
     bench('blair');
-    await h.post('/api/traffic/i280');
+    await h.post('/api/traffic/us101');
     h.clock.advance(60_000);
     await h.post('/tools/report_disruption', disruption);
 
@@ -60,10 +60,10 @@ describe('snapshot: Disruption before → after, tally, forecasts', () => {
         placementId: 'P1',
         jobId: 'J17',
         driverId: 'alex',
-        reason: 'stuck behind the I-280 closure',
+        reason: 'stuck behind the US-101 closure',
         reportedAt: '2026-10-24T14:01:00.000Z',
         status: 'running',
-        before: { driverId: 'alex', arrivalAt: '2026-10-24T15:09:00.000Z', minutesLate: 9 },
+        before: { driverId: 'alex', arrivalAt: '2026-10-24T15:13:00.000Z', minutesLate: 13 },
         after: null,
         endedAt: null,
         secondsToFix: null,
@@ -83,7 +83,7 @@ describe('snapshot: Disruption before → after, tally, forecasts', () => {
     s = await h.state();
     expect(s.disruptions[0]).toMatchObject({
       status: 'placed',
-      reason: 'stuck behind the I-280 closure',
+      reason: 'stuck behind the US-101 closure',
       after: { driverId: 'casey', arrivalAt: '2026-10-24T14:29:00.000Z', minutesLate: -31 },
       endedAt: '2026-10-24T14:02:00.000Z',
       secondsToFix: 60,

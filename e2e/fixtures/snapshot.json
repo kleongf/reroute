@@ -8,13 +8,14 @@
       "phone": null,
       "simulated": false,
       "position": {
-        "lat": 37.7599,
-        "lng": -122.4148
+        "lat": 37.7478,
+        "lng": -122.404
       },
       "capacity": 2,
       "availableFrom": "2026-10-24T09:00:00.000Z",
       "availableUntil": "2026-10-24T17:00:00.000Z",
-      "version": 1
+      "version": 1,
+      "holdPosition": true
     },
     {
       "id": "blair",
@@ -188,13 +189,12 @@
   "queue": [],
   "activeTraffic": [
     {
-      "id": "i280",
-      "label": "I-280 closed",
+      "id": "us101",
+      "label": "US-101 north closed at Cesar Chavez",
       "path": [
-        [37.7334, -122.4062],
-        [37.7489, -122.4031],
-        [37.7612, -122.4058],
-        [37.7699, -122.4011]
+        [37.7486, -122.4043],
+        [37.7497, -122.405],
+        [37.7508, -122.4055]
       ],
       "addedMinutes": {
         "alex": 40
@@ -203,8 +203,8 @@
   ],
   "trafficEvents": [
     {
-      "id": "i280",
-      "label": "I-280 closed"
+      "id": "us101",
+      "label": "US-101 north closed at Cesar Chavez"
     }
   ],
   "log": [],
@@ -217,7 +217,13 @@
     "averageSecondsToFix": null
   },
   "etas": {
-    "minutes": {},
+    "minutes": {
+      "alex": {
+        "J17": 14,
+        "J18": 10,
+        "J19": 27
+      }
+    },
     "source": {}
   }
 }

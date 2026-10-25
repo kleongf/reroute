@@ -77,8 +77,8 @@ test('map follows a Disruption through at risk, placing and placed', async ({ pa
   await expect(map.getByTestId('map-provenance')).toContainText('simulated positions');
   await expect(map.locator('.map-marker--pickup[data-health=trouble]')).toHaveCount(0);
 
-  // At risk: I-280 closure pulses J17 red and draws the traffic path.
-  expect((await request.post('/api/traffic/i280')).ok()).toBe(true);
+  // At risk: US-101 closure pulses J17 red and draws the traffic path.
+  expect((await request.post('/api/traffic/us101')).ok()).toBe(true);
   await expect(map.locator('.map-marker--pickup[data-health=trouble]')).toHaveCount(1);
   await expect(map.locator('.map-traffic')).toHaveCount(1);
   await expect(map.getByTestId('map-provenance')).toContainText('simulated traffic');
@@ -88,7 +88,7 @@ test('map follows a Disruption through at risk, placing and placed', async ({ pa
   const reported = await request.post('/tools/report_disruption', {
     data: tool(
       'report_disruption',
-      { job_id: 'J17', reason: 'stuck behind the I-280 closure', collected: false },
+      { job_id: 'J17', reason: 'stuck behind the US-101 closure', collected: false },
       { from_number: TEST_SERVER_ENV.DRIVER_PHONE_ALEX },
     ),
   });

@@ -19,10 +19,10 @@ describe('Traffic event → At Risk check call', () => {
   });
 
   it('marks only deadline-missing Jobs At Risk and calls their Driver once', async () => {
-    const res = await h.post('/api/traffic/i280');
+    const res = await h.post('/api/traffic/us101');
     expect(res.status).toBe(200);
     const s = await h.state();
-    expect(s.activeTraffic.map((t) => t.id)).toEqual(['i280']);
+    expect(s.activeTraffic.map((t) => t.id)).toEqual(['us101']);
     expect(s.jobs.map((j) => [j.id, j.status])).toEqual([
       ['J17', 'at_risk'],
       ['J18', 'assigned'],
@@ -42,8 +42,8 @@ describe('Traffic event → At Risk check call', () => {
           pickup_name: 'Oak Street Florist',
           deadline_spoken: '8:00 AM',
           parcels: '2',
-          reason: 'I-280 closed',
-          eta_spoken: '8:08 AM',
+          reason: 'US-101 north closed at Cesar Chavez',
+          eta_spoken: '8:12 AM',
           delay_minutes: '40',
         },
       },
@@ -51,9 +51,9 @@ describe('Traffic event → At Risk check call', () => {
   });
 
   it('injecting the same traffic event twice changes nothing and places no second call', async () => {
-    await h.post('/api/traffic/i280');
+    await h.post('/api/traffic/us101');
     const before = await h.state();
-    const again = await h.post('/api/traffic/i280');
+    const again = await h.post('/api/traffic/us101');
     expect(again.status).toBe(200);
     const after = await h.state();
     expect(after.jobs).toEqual(before.jobs);
@@ -68,7 +68,7 @@ describe('Traffic event → At Risk check call', () => {
   });
 
   it('confirm_on_track returns the Job to assigned with "Driver confirmed"', async () => {
-    await h.post('/api/traffic/i280');
+    await h.post('/api/traffic/us101');
     const res = await h.post(
       '/tools/confirm_on_track',
       tool(
@@ -91,7 +91,7 @@ describe('Traffic event → At Risk check call', () => {
   });
 
   it('confirm_on_track rejects a Driver who does not hold the Job', async () => {
-    await h.post('/api/traffic/i280');
+    await h.post('/api/traffic/us101');
     const res = await h.post(
       '/tools/confirm_on_track',
       tool('confirm_on_track', { driver_id: 'casey', job_id: 'J17' }),
@@ -101,12 +101,12 @@ describe('Traffic event → At Risk check call', () => {
   });
 
   it('"I can\'t make it" via report_disruption starts the same Placement as a Disruption', async () => {
-    await h.post('/api/traffic/i280');
+    await h.post('/api/traffic/us101');
     const res = await h.post(
       '/tools/report_disruption',
       tool(
         'report_disruption',
-        { job_id: 'J17', reason: 'stuck in I-280 traffic', collected: false },
+        { job_id: 'J17', reason: 'stuck in US-101 traffic', collected: false },
         { retell_llm_dynamic_variables: { driver_id: 'alex', call_kind: 'at_risk_check' } },
       ),
     );

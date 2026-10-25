@@ -28,7 +28,8 @@
     "retell:export": "node --env-file-if-exists=.env scripts/retell-export.ts",
     "prepare": "husky",
     "retell:calls": "node --env-file-if-exists=.env scripts/retell-calls.ts",
-    "retell:point": "node --env-file-if-exists=.env scripts/retell-point-agent.ts"
+    "retell:point": "node --env-file-if-exists=.env scripts/retell-point-agent.ts",
+    "demo:record": "tsx scripts/demo-record.ts"
   },
   "lint-staged": {
     "*.{ts,tsx,js}": [

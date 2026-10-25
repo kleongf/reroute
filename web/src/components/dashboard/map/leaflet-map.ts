@@ -5,6 +5,7 @@
 import L from 'leaflet';
 import type { LatLng, StateSnapshot } from '@backend/domain/types.ts';
 import { createVehicleMotion } from '@/lib/vehicle-motion.ts';
+import { driverTraffic } from '../demo/traffic.ts';
 
 /** San Francisco, matching fixtures/demo.json. */
 const SF_CENTER: [number, number] = [37.7649, -122.4294];
@@ -183,6 +184,9 @@ export function createLeafletMap(canvas: HTMLElement, options: MapOptions = {}):
           .map((d) => d.jobId)
           .filter((id) => jobById.get(id)?.status === 'assigned'),
       );
+      const focusJobId = snapshot.jobs
+        .filter((job) => job.status !== 'done')
+        .sort((a, b) => a.deadline.localeCompare(b.deadline))[0]?.id;
 
       const addMarker = (at: LatLng, kind: string, text: string, health?: Health) => {
         const icon = labelIcon(health ? `${kind} map-marker--${health}` : kind);
@@ -211,6 +215,17 @@ export function createLeafletMap(canvas: HTMLElement, options: MapOptions = {}):
           : fixedJobIds.has(job.id)
             ? 'fixed'
             : 'ok';
+        if (job.id === focusJobId || health === 'trouble' || health === 'fixed') {
+          const trip = L.polyline([ll(job.pickup), ll(job.dropoff)], {
+            color: health === 'fixed' ? '#1a7f37' : '#64748b',
+            weight: 3,
+            opacity: 0.7,
+            className: 'map-line map-line--trip',
+          })
+            .bindTooltip(`${job.id} Pickup → drop-off · illustrative connection`)
+            .addTo(layer);
+          trip.getElement()?.setAttribute('data-job-id', job.id);
+        }
         if (driver) {
           const line = L.polyline([shown(driver.id, driver.position), ll(job.pickup)], {
             color: health === 'trouble' ? '#cf222e' : health === 'fixed' ? '#1a7f37' : '#1d3557',
@@ -252,13 +267,16 @@ export function createLeafletMap(canvas: HTMLElement, options: MapOptions = {}):
         ),
       );
       for (const driver of snapshot.drivers) {
+        const traffic = driverTraffic(snapshot, driver.id);
         const marker = addMarker(
           driver.position,
           'driver',
-          driver.name,
+          `${driver.name}${traffic.minutes > 0 ? ` +${String(traffic.minutes)} min` : ''}`,
           calling.has(driver.id) ? 'calling' : undefined,
         );
         marker.getElement()?.setAttribute('data-driver-id', driver.id);
+        if (traffic.minutes > 0)
+          marker.bindTooltip(`${traffic.labels} · delay before Pickup · simulated traffic`);
         driverMarkers.set(driver.id, marker);
       }
       if (frame !== 0) cancelAnimationFrame(frame);

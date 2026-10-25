@@ -22,6 +22,8 @@ export interface Driver {
   /** True = Offers resolve without a call (labelled "simulated Offer"). */
   simulated: boolean;
   position: LatLng;
+  /** Visual only: hold this simulated Driver before Pickup during the demo. */
+  holdPosition?: boolean;
   /** Free parcel slots. */
   capacity: number;
   availableFrom: string;

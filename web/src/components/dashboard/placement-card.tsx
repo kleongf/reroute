@@ -16,6 +16,7 @@ import {
   type PlacementView,
 } from './placement/model.ts';
 import type { DashboardProps } from './types.ts';
+import { DriverTraffic } from './demo/job-timing.tsx';
 
 const STATUS_TONE = {
   queued: 'bg-secondary text-secondary-foreground',
@@ -107,6 +108,7 @@ function PlacementBody({ snapshot: s }: { snapshot: StateSnapshot }) {
                   </span>
                 </div>
                 {o && <OfferBadge offer={o} />}
+                <DriverTraffic snapshot={s} driverId={e.driverId} />
               </div>
             </li>
           );
@@ -124,13 +126,11 @@ function PlacementBody({ snapshot: s }: { snapshot: StateSnapshot }) {
               <span aria-hidden>✕</span>
               <div className="flex flex-col gap-1">
                 <span className="line-through">{driverName(s, i.driverId)}</span>
-                {o ? (
-                  <OfferBadge offer={o} />
-                ) : (
-                  <span className="text-xs" data-testid="ineligible-reason">
-                    {i.reason.text}
-                  </span>
-                )}
+                <DriverTraffic snapshot={s} driverId={i.driverId} />
+                {o && <OfferBadge offer={o} />}
+                <span className="text-xs" data-testid="ineligible-reason">
+                  {i.reason.text}
+                </span>
               </div>
             </li>
           );

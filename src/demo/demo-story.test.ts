@@ -42,9 +42,9 @@ describe('Demo story, end to end', () => {
   it('plays the run order: traffic → Alex out → Blair simulated → Casey → release → Urgent Job → Alex', async () => {
     expect((await h.post('/api/reset')).status).toBe(200);
 
-    // 0:30 Inject I-280 closed: check call to Alex.
+    // 0:30 Inject US-101 north closed at Cesar Chavez: check call to Alex.
     h.clock.advance(minutes(0.5));
-    expect((await h.post('/api/traffic/i280')).status).toBe(200);
+    expect((await h.post('/api/traffic/us101')).status).toBe(200);
     expect(job(await h.state(), 'J17')?.status).toBe('at_risk');
 
     // Alex can't make it.
@@ -53,7 +53,7 @@ describe('Demo story, end to end', () => {
       '/tools/report_disruption',
       tool(
         'report_disruption',
-        { job_id: 'J17', reason: 'stuck behind the I-280 closure', collected: false },
+        { job_id: 'J17', reason: 'stuck behind the US-101 closure', collected: false },
         { from_number: ALEX_PHONE },
       ),
     );
@@ -67,7 +67,7 @@ describe('Demo story, end to end', () => {
     s = await h.state();
     const j17 = placementFor(s, 'J17');
     expect(j17.offers).toMatchObject([
-      { driverId: 'blair', status: 'declined', declineReason: 'only room for one' },
+      { driverId: 'blair', status: 'declined', declineReason: 'my van’s full' },
       { driverId: 'casey', status: 'pending' },
     ]);
 

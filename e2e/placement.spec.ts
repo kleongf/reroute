@@ -27,7 +27,7 @@ test('Placement card, queue and call card: placing → placed', async ({ page, r
   const reported = await request.post('/tools/report_disruption', {
     data: tool(
       'report_disruption',
-      { job_id: 'J17', reason: 'stuck behind the I-280 closure', collected: false },
+      { job_id: 'J17', reason: 'stuck behind the US-101 closure', collected: false },
       { from_number: TEST_SERVER_ENV.DRIVER_PHONE_ALEX },
     ),
   });
@@ -35,7 +35,7 @@ test('Placement card, queue and call card: placing → placed', async ({ page, r
 
   await expect(page.getByTestId('placement-status')).toHaveAttribute('data-status', 'running');
   await expect(page.getByTestId('call-title')).toHaveText('Offer to Casey');
-  await expect(panel).toContainText('only room for one');
+  await expect(panel).toContainText('my van’s full');
   await expect(panel).toContainText('simulated Offer');
   await expect(page.getByTestId('eligible-list')).toContainText('Offer: calling…');
   await expect(page.getByTestId('eligible-list')).toContainText(/\d+ min to Pickup · \w+/);
