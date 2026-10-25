@@ -8,6 +8,7 @@ import { setTimeout as delay } from 'node:timers/promises';
  * the server's FakeVoice (never a real phone), and a short simulated-Offer delay.
  */
 export const TEST_SERVER_ENV = {
+  VOICE_MODE: 'fake',
   DRIVER_PHONE_ALEX: '+15550000001',
   DRIVER_PHONE_CASEY: '+15550000002',
   DISPATCHER_PHONE: '+15550000009',

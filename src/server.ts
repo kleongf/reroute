@@ -81,7 +81,9 @@ const app = createApp({
   phones,
   voice,
   engine,
-  ...(config.VOICE_MODE === 'retell' ? { retellApiKey: config.RETELL_API_KEY ?? '' } : {}),
+  ...(config.VOICE_MODE === 'retell'
+    ? { retellApiKey: config.RETELL_WEBHOOK_API_KEY ?? config.RETELL_API_KEY ?? '' }
+    : {}),
 });
 
 const server = serve({ fetch: app.fetch, port: config.PORT }, (info) => {

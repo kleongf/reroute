@@ -87,7 +87,7 @@ export function createApp(deps: AppDeps): Hono {
     return c.json(toSnapshot(deps.store.get(), deps.clock.now()));
   });
 
-  // Capture only: this route does not authenticate Retell or authorize domain changes.
+  // Capture only: signed in Retell mode, without authority to change fleet state.
   app.post('/tools/tracer_ping', async (c) => {
     let body: unknown;
     try {

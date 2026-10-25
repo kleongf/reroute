@@ -9,7 +9,8 @@ Use the existing local `.env`; never commit credentials or real phone numbers.
 
 ```dotenv
 VOICE_MODE=retell
-RETELL_API_KEY=<webhook-badged API key>
+RETELL_API_KEY=<API key for outbound REST calls>
+RETELL_WEBHOOK_API_KEY=<API key marked Webhook in the same workspace>
 RETELL_FROM_NUMBER=<Retell outbound number>
 RETELL_AGENT_ID=<fleet agent, also used for inbound calls>
 DRIVER_PHONE_ALEX=<Alex demo phone>
@@ -24,6 +25,9 @@ They fall back to `RETELL_AGENT_ID`. Only the three configured demo numbers can 
 called. An API key alone does not enable real calling; select `VOICE_MODE=retell`
 explicitly. `VOICE_MODE=fake` is the offline development/test mode and has unsigned
 local tool endpoints; signed callback verification runs in Retell mode.
+`RETELL_WEBHOOK_API_KEY` defaults to `RETELL_API_KEY` when omitted. A key can create
+calls successfully while failing callback verification if it is not the key marked
+Webhook. Test/explore server helpers force fake mode even when `.env` enables real calls.
 
 Generate the LLM/agent configuration without creating agents or placing calls:
 
@@ -38,6 +42,20 @@ number's inbound agent to the fleet agent. Keep the custom-function full envelop
 The prompts are committed in `src/retell/prompts/` and cover all call kinds and
 inbound Driver status/Disruption calls. Never treat silence, voicemail, or an
 unclear reply after one clarification as acceptance.
+
+Publish the dedicated fleet Agent version before calling: the transport explicitly
+selects `latest_published`. For later updates, create a draft from the published
+version, update its existing Retell LLM, then publish that draft. Retell rejects
+swapping response-engine IDs after versions exist. Keep the same Agent ID in
+`.env`. The existing source number's inbound binding points at the fleet Agent's
+`latest_published` version.
+
+Generated settings include call-screening identity/purpose, a two-minute call
+limit, thirty-second silence allowance, and five-second tool transport timeout.
+Backend tool responses still return quickly; the timeout allows network transit.
+Automatic voicemail detection is disabled to avoid cutting off screening; the
+prompt still treats actual voicemail and unclear replies as Unanswered. Default
+string variables permit inbound calls; outbound context overrides them.
 
 ## Backend flow
 
@@ -79,9 +97,13 @@ caller/Offer binding, response replay, reset safety, outbound transport requests
 slow-call queuing, bounded retries, and transcript revisions. No test makes a
 Retell API request or places a real call.
 
-The real payload samples from #3 must still be captured and replayed against these
-schemas. Until that happens, tests are documented-contract examples, not claimed
-live captures. The real-phone acceptance criterion of #6 stays open: Alex reports
+The reviewed real payload samples from #3 are in `fixtures/retell/tracer-call`.
+They are replayed through signed HTTP, including the streamed transcript at the
+envelope root. The capture-only tracer is signature-checked without requiring a
+fleet Driver identity and cannot change Jobs; all fleet tools retain identity
+binding and replay protection.
+
+The real-phone acceptance criterion of #6 is: Alex reports
 a Disruption, Casey receives and accepts an Offer, Alex receives the release call,
 and the UI prototype shows the transcript. Do not close #6 on offline tests alone.
 

@@ -70,6 +70,20 @@ export function buildRetellConfig(baseUrl: string) {
   return {
     llm: {
       general_prompt: prompt,
+      default_dynamic_variables: {
+        call_kind: 'inbound',
+        driver_id: '',
+        driver_name: '',
+        job_id: '',
+        job_label: '',
+        pickup_name: '',
+        offer_id: '',
+        parcels: '',
+        deadline_spoken: '',
+        eta_spoken: '',
+        delay_minutes: '',
+        reason: '',
+      },
       general_tools: [
         ...tools.map((tool) => ({
           type: 'custom',
@@ -84,7 +98,7 @@ export function buildRetellConfig(baseUrl: string) {
             required: tool.required,
             additionalProperties: false,
           },
-          timeout_ms: 1000,
+          timeout_ms: 5000,
           speak_during_execution: false,
           speak_after_execution: true,
         })),
@@ -95,7 +109,13 @@ export function buildRetellConfig(baseUrl: string) {
       webhook_url: `${base}/webhooks/retell`,
       webhook_events: ['call_started', 'call_ended', 'call_analyzed', 'transcript_updated'],
       webhook_timeout_ms: 10000,
-      end_call_after_silence_ms: 10000,
+      end_call_after_silence_ms: 30000,
+      max_call_duration_ms: 120000,
+      voicemail_option: null,
+      call_screening_option: {
+        agent_identity: 'Reroute, an AI fleet dispatcher',
+        call_purpose: 'delivery coordination for this Driver',
+      },
     },
   };
 }
