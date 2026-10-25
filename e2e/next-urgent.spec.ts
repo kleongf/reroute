@@ -100,6 +100,9 @@ test.describe('/next traffic menu', () => {
     await item.click();
     expect((await posted).ok()).toBe(true);
 
+    // The HTTP response can arrive before the menu finishes closing after selection.
+    // Reopen only after that transition, otherwise this click can close it again.
+    await expect(menu).toBeHidden();
     await page.getByTestId('traffic-menu-trigger').click();
     await expect(page.getByTestId('inject-traffic-i280')).toHaveAttribute('data-disabled', '');
   });
