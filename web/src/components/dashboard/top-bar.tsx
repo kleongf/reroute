@@ -13,7 +13,9 @@ import {
   timerDisruption,
   type BannerTone,
 } from './disruptions/model.ts';
+import { TrafficMenu } from './traffic-menu.tsx';
 import type { DashboardProps } from './types.ts';
+import { OPEN_URGENT_JOB_EVENT } from './urgent-job-dialog.tsx';
 import './disruptions/disruptions.css';
 
 /**
@@ -21,8 +23,6 @@ import './disruptions/disruptions.css';
  * the Urgent Job Dialog and the Inject traffic DropdownMenu. `detail.anchor` is the
  * trigger button, so a popover can position against it.
  */
-export const OPEN_URGENT_JOB_EVENT = 'reroute:open-urgent-job';
-export const OPEN_TRAFFIC_MENU_EVENT = 'reroute:open-traffic-menu';
 
 export interface OpenEventDetail {
   anchor: HTMLElement;
@@ -104,16 +104,7 @@ export function TopBar({ snapshot }: DashboardProps) {
         >
           Reset demo
         </Button>
-        <span data-testid="traffic-buttons">
-          <Button
-            data-testid="inject-traffic"
-            variant="outline"
-            disabled={snapshot.trafficEvents.length === 0}
-            onClick={dispatchOpen(OPEN_TRAFFIC_MENU_EVENT)}
-          >
-            Inject traffic
-          </Button>
-        </span>
+        <TrafficMenu snapshot={snapshot} />
         <Button data-testid="urgent-toggle" onClick={dispatchOpen(OPEN_URGENT_JOB_EVENT)}>
           + Urgent Job
         </Button>

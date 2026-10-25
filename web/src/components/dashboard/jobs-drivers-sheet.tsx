@@ -18,9 +18,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { TrafficMenu } from './traffic-menu.tsx';
 import type { DashboardProps } from './types.ts';
-import { OPEN_URGENT_JOB_EVENT, UrgentJobDialog } from './urgent-job-dialog.tsx';
+import { UrgentJobDialog } from './urgent-job-dialog.tsx';
 
 const DEMO_TIME_ZONE = 'America/Los_Angeles';
 
@@ -77,7 +76,7 @@ export function JobsDriversSheet({ snapshot }: DashboardProps) {
 
   return (
     <TooltipProvider>
-      <div className="absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-lg bg-background/90 p-1 shadow">
+      <div className="absolute bottom-12 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-lg bg-background/90 p-1 shadow">
         <Button
           variant="outline"
           size="sm"
@@ -89,17 +88,6 @@ export function JobsDriversSheet({ snapshot }: DashboardProps) {
         >
           Jobs · Drivers
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          data-testid="sheet-urgent-trigger"
-          onClick={() => {
-            window.dispatchEvent(new CustomEvent(OPEN_URGENT_JOB_EVENT));
-          }}
-        >
-          + Urgent Job
-        </Button>
-        <TrafficMenu snapshot={snapshot} />
       </div>
       <UrgentJobDialog />
       <Sheet open={open} onOpenChange={setOpen}>

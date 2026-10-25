@@ -59,7 +59,7 @@ test.describe('/next Urgent Job dialog', () => {
     page.on('request', (r) => {
       if (r.url().endsWith('/api/jobs')) posts += 1;
     });
-    await page.getByTestId('sheet-urgent-trigger').click();
+    await page.getByTestId('urgent-toggle').click();
     await page.getByRole('button', { name: 'Add Urgent Job' }).click();
     await expect(page.getByTestId('urgent-error')).toContainText('label: label is required');
     expect(posts).toBe(0);
