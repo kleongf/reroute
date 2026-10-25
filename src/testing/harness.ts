@@ -63,7 +63,7 @@ export function createHarness(phones: PhoneBook = HARNESS_PHONES): Harness {
     db,
     clock,
     heartbeatMs: 1_000,
-    webDir,
+    publicDir: webDir,
     store,
     scenario,
     phones,

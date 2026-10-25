@@ -20,8 +20,8 @@ export interface AppDeps {
   readonly db: DatabaseSync;
   readonly clock: Clock;
   readonly heartbeatMs: number;
-  /** Directory holding the web/ build (the dashboard), served at /. */
-  readonly webDir: string;
+  /** Directory holding the dashboard: the web/ build (dist/web), served at /. */
+  readonly publicDir: string;
   readonly store: Store;
   readonly scenario: Scenario;
   readonly phones: PhoneBook;
@@ -138,7 +138,7 @@ export function createApp(deps: AppDeps): Hono {
     return c.body(null, 204);
   });
 
-  registerWebApp(app, deps.webDir);
+  registerWebApp(app, deps.publicDir);
 
   return app;
 }

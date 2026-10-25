@@ -85,7 +85,7 @@ const app = createApp({
   db,
   clock: systemClock,
   heartbeatMs: config.HEARTBEAT_MS,
-  webDir,
+  publicDir: webDir,
   store,
   scenario,
   phones,
