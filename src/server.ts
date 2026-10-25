@@ -13,6 +13,8 @@ import { attachRoutedEtas } from './routing/refresh.ts';
 import { loadScenario, readScenarioFile } from './store/scenario.ts';
 import { createStore } from './store/store.ts';
 import { createFakeVoice } from './voice/port.ts';
+import { createRetellVoice } from './retell/voice.ts';
+import { createVoiceOutbox } from './retell/outbox.ts';
 
 if (existsSync('.env')) {
   // Does not override variables already set in the environment.
@@ -45,8 +47,34 @@ if (config.ROUTING === 'tomtom') {
     }),
   );
 }
-// Replaced by the Retell implementation in #6.
-const voice = createFakeVoice();
+// Persist outbound calls before returning tool results; dispatch through Retell in the background.
+const outbox =
+  config.VOICE_MODE === 'retell'
+    ? createVoiceOutbox({
+        db,
+        store,
+        clock: systemClock,
+        onUnanswered: (offerId) => engine.markUnanswered(offerId),
+        transport: createRetellVoice({
+          apiKey: config.RETELL_API_KEY ?? '',
+          fromNumber: config.RETELL_FROM_NUMBER ?? '',
+          agentIds: {
+            offer: config.RETELL_AGENT_OFFER ?? config.RETELL_AGENT_ID ?? '',
+            at_risk_check: config.RETELL_AGENT_AT_RISK_CHECK ?? config.RETELL_AGENT_ID ?? '',
+            release: config.RETELL_AGENT_RELEASE ?? config.RETELL_AGENT_ID ?? '',
+            escalation: config.RETELL_AGENT_ESCALATION ?? config.RETELL_AGENT_ID ?? '',
+          },
+          allowedNumbers: new Set(
+            [
+              phones['DRIVER_PHONE_ALEX'],
+              phones['DRIVER_PHONE_CASEY'],
+              phones['DISPATCHER_PHONE'],
+            ].filter((phone): phone is string => Boolean(phone)),
+          ),
+        }),
+      })
+    : null;
+const voice = outbox ?? createFakeVoice();
 const engine = createEngine({
   store,
   clock: systemClock,
@@ -66,6 +94,7 @@ const app = createApp({
   phones,
   voice,
   engine,
+  ...(config.VOICE_MODE === 'retell' ? { retellApiKey: config.RETELL_API_KEY ?? '' } : {}),
 });
 
 const server = serve({ fetch: app.fetch, port: config.PORT }, (info) => {
@@ -76,6 +105,7 @@ let shuttingDown = false;
 function shutdown(signal: NodeJS.Signals): void {
   if (shuttingDown) return;
   shuttingDown = true;
+  outbox?.close();
   log('info', 'shutting down', { signal });
   setTimeout(() => {
     log('error', 'forced exit after shutdown timeout');
