@@ -73,58 +73,90 @@ if (agentIds.length === 0) {
 const host = (url: unknown) => (typeof url === 'string' ? (url.split('/')[2] ?? url) : '-');
 let changes = 0;
 
+const urlFor = (tool: Rec) => `${base}/tools/${String(tool['name'])}`;
+const toolsOf = (llm: Rec) =>
+  (Array.isArray(llm['general_tools']) ? llm['general_tools'] : []) as Rec[];
+const staleTools = (tools: Rec[]) =>
+  tools.filter((t) => t['type'] === 'custom' && t['url'] !== urlFor(t));
+const webhook = `${base}/webhooks/retell`;
+
+/**
+ * Calls use the agent's `latest_published` version (src/retell/voice.ts), and published
+ * versions are immutable. So: draft from the published version → point the draft's LLM
+ * tools and webhook → publish the draft → read `latest_published` back and verify.
+ */
 for (const agentId of agentIds) {
   if (agentId === tracer) {
     console.log(`⏭  ${agentId} is the tracer agent; skipping.`);
     continue;
   }
-  const agent = await retell('GET', `/get-agent/${agentId}`);
-  const engine = (agent['response_engine'] ?? {}) as Rec;
+  const published = await retell('GET', `/get-agent/${agentId}?version=latest_published`);
+  const engine = (published['response_engine'] ?? {}) as Rec;
   const llmId = typeof engine['llm_id'] === 'string' ? engine['llm_id'] : '';
-  console.log(
-    `\nagent ${agentId} · version ${String(agent['version'])} · published ${String(agent['is_published'])}`,
-  );
-
-  const webhook = `${base}/webhooks/retell`;
-  if (agent['webhook_url'] !== webhook) {
-    changes += 1;
-    console.log(`  webhook_url: ${host(agent['webhook_url'])} → ${host(webhook)}`);
-    if (values.apply) await retell('PATCH', `/update-agent/${agentId}`, { webhook_url: webhook });
-  } else {
-    console.log('  webhook_url: already current');
-  }
-
+  console.log(`\nagent ${agentId} · latest published version ${String(published['version'])}`);
   if (engine['type'] !== 'retell-llm' || !llmId) {
     console.log(`  response engine ${String(engine['type'])}: no Retell LLM tools to update`);
     continue;
   }
-  const llm = await retell('GET', `/get-retell-llm/${llmId}`);
-  const tools = (Array.isArray(llm['general_tools']) ? llm['general_tools'] : []) as Rec[];
-  // Send the complete list so nothing is dropped, whatever Retell's PATCH semantics.
-  const updated = tools.map((tool) => {
-    if (tool['type'] !== 'custom' || typeof tool['name'] !== 'string') return tool;
-    const url = `${base}/tools/${tool['name']}`;
-    if (tool['url'] !== url) {
-      changes += 1;
-      console.log(`  tool ${tool['name']}: ${host(tool['url'])} → ${host(url)}`);
-    }
-    return { ...tool, url };
-  });
-  if (values.apply) {
-    await retell('PATCH', `/update-retell-llm/${llmId}`, { general_tools: updated });
-    const check = await retell('GET', `/get-retell-llm/${llmId}`);
-    const after = (Array.isArray(check['general_tools']) ? check['general_tools'] : []) as Rec[];
-    const stale = after.filter(
-      (t) => t['type'] === 'custom' && t['url'] !== `${base}/tools/${String(t['name'])}`,
-    );
-    if (after.length !== tools.length || stale.length > 0) {
-      console.error(
-        `  ❌ read-back mismatch: ${String(after.length)}/${String(tools.length)} tools, ${String(stale.length)} stale`,
-      );
-      process.exit(1);
-    }
-    console.log(`  ✅ read back ${String(after.length)} tools, all on ${host(base)}`);
+  const llm = await retell('GET', `/get-retell-llm/${llmId}?version=${String(engine['version'])}`);
+  const tools = toolsOf(llm);
+  const pending = staleTools(tools);
+  const webhookStale = published['webhook_url'] !== webhook;
+  for (const t of pending) {
+    console.log(`  tool ${String(t['name'])}: ${host(t['url'])} → ${host(urlFor(t))}`);
   }
+  if (webhookStale) {
+    console.log(`  webhook_url: ${host(published['webhook_url'])} → ${host(webhook)}`);
+  }
+  const count = pending.length + (webhookStale ? 1 : 0);
+  changes += count;
+  if (count === 0) {
+    console.log('  already current');
+    continue;
+  }
+  if (!values.apply) continue;
+
+  const draft = await retell('POST', `/create-agent-version/${agentId}`, {
+    base_version: published['version'],
+  });
+  const draftVersion = String(draft['version']);
+  const draftEngine = (draft['response_engine'] ?? {}) as Rec;
+  const draftLlmVersion = String(draftEngine['version'] ?? engine['version']);
+  console.log(`  draft version ${draftVersion} (LLM version ${draftLlmVersion})`);
+  // Send the complete tool list so nothing is dropped, whatever Retell's PATCH semantics.
+  await retell('PATCH', `/update-retell-llm/${llmId}?version=${draftLlmVersion}`, {
+    general_tools: tools.map((t) => (t['type'] === 'custom' ? { ...t, url: urlFor(t) } : t)),
+  });
+  await retell('PATCH', `/update-agent/${agentId}?version=${draftVersion}`, {
+    webhook_url: webhook,
+  });
+  await retell('POST', `/publish-agent-version/${agentId}`, {
+    version: Number(draftVersion),
+    version_title: `Point at ${host(base)}`,
+  });
+
+  const live = await retell('GET', `/get-agent/${agentId}?version=latest_published`);
+  const liveEngine = (live['response_engine'] ?? {}) as Rec;
+  const liveTools = toolsOf(
+    await retell('GET', `/get-retell-llm/${llmId}?version=${String(liveEngine['version'])}`),
+  );
+  const stillStale = staleTools(liveTools);
+  if (
+    String(live['version']) !== draftVersion ||
+    live['webhook_url'] !== webhook ||
+    liveTools.length !== tools.length ||
+    stillStale.length > 0
+  ) {
+    console.error(
+      `  ❌ read-back mismatch: published v${String(live['version'])}, ` +
+        `${String(liveTools.length)}/${String(tools.length)} tools, ${String(stillStale.length)} stale, ` +
+        `webhook ${host(live['webhook_url'])}`,
+    );
+    process.exit(1);
+  }
+  console.log(
+    `  ✅ published v${draftVersion}: ${String(liveTools.length)} tools + webhook on ${host(base)}`,
+  );
 }
 
 // 2. Which agent version does the phone number actually use?
