@@ -4,14 +4,22 @@
  *
  *   node --env-file-if-exists=.env scripts/retell-point-agent.ts           # dry run: show the diff
  *   node --env-file-if-exists=.env scripts/retell-point-agent.ts --apply   # write, then read back
+ *   … --sync-prompt                    # also publish the committed prompt files
  *
  * Refuses to apply unless `${PUBLIC_BASE_URL}/health` answers 200, so a dead tunnel is never
  * written into the agent. Covers RETELL_AGENT_ID and any per-kind RETELL_AGENT_* overrides.
  * The tracer agent (RETELL_TRACER_AGENT_ID) is deliberately left alone.
  */
 import { parseArgs } from 'node:util';
+import { buildRetellConfig } from './retell-config.ts';
 
-const { values } = parseArgs({ options: { apply: { type: 'boolean', default: false } } });
+const { values } = parseArgs({
+  options: {
+    apply: { type: 'boolean', default: false },
+    // Also replace the LLM's general_prompt with the committed src/retell/prompts/*.md.
+    'sync-prompt': { type: 'boolean', default: false },
+  },
+});
 
 const env = (name: string) => process.env[name]?.trim() ?? '';
 const key = env('RETELL_API_KEY');
@@ -36,7 +44,8 @@ async function retell(method: string, path: string, body?: unknown): Promise<Rec
   const text = await res.text();
   if (!res.ok)
     throw new Error(`${method} ${path} → HTTP ${String(res.status)}: ${text.slice(0, 300)}`);
-  return JSON.parse(text) as Rec;
+  // Some endpoints (e.g. publish-agent-version) answer 200 with an empty body.
+  return (text.trim() === '' ? {} : JSON.parse(text)) as Rec;
 }
 
 // 1. The tunnel must actually reach this server.
@@ -108,7 +117,14 @@ for (const agentId of agentIds) {
   if (webhookStale) {
     console.log(`  webhook_url: ${host(published['webhook_url'])} → ${host(webhook)}`);
   }
-  const count = pending.length + (webhookStale ? 1 : 0);
+  const prompt = values['sync-prompt'] ? buildRetellConfig(base).llm.general_prompt : null;
+  const promptStale = prompt !== null && llm['general_prompt'] !== prompt;
+  if (promptStale) {
+    console.log(
+      `  general_prompt: ${String(typeof llm['general_prompt'] === 'string' ? llm['general_prompt'].length : 0)} → ${String(prompt.length)} chars`,
+    );
+  }
+  const count = pending.length + (webhookStale ? 1 : 0) + (promptStale ? 1 : 0);
   changes += count;
   if (count === 0) {
     console.log('  already current');
@@ -126,13 +142,14 @@ for (const agentId of agentIds) {
   // Send the complete tool list so nothing is dropped, whatever Retell's PATCH semantics.
   await retell('PATCH', `/update-retell-llm/${llmId}?version=${draftLlmVersion}`, {
     general_tools: tools.map((t) => (t['type'] === 'custom' ? { ...t, url: urlFor(t) } : t)),
+    ...(prompt === null ? {} : { general_prompt: prompt }),
   });
   await retell('PATCH', `/update-agent/${agentId}?version=${draftVersion}`, {
     webhook_url: webhook,
   });
   await retell('POST', `/publish-agent-version/${agentId}`, {
     version: Number(draftVersion),
-    version_title: `Point at ${host(base)}`,
+    version_title: `Point at ${host(base)}${prompt === null ? '' : ' + prompt sync'}`,
   });
 
   const live = await retell('GET', `/get-agent/${agentId}?version=latest_published`);
@@ -141,6 +158,16 @@ for (const agentId of agentIds) {
     await retell('GET', `/get-retell-llm/${llmId}?version=${String(liveEngine['version'])}`),
   );
   const stillStale = staleTools(liveTools);
+  const liveLlm = await retell(
+    'GET',
+    `/get-retell-llm/${llmId}?version=${String(liveEngine['version'])}`,
+  );
+  if (prompt !== null && liveLlm['general_prompt'] !== prompt) {
+    console.error(
+      '  ❌ read-back mismatch: published general_prompt differs from the prompt files',
+    );
+    process.exit(1);
+  }
   if (
     String(live['version']) !== draftVersion ||
     live['webhook_url'] !== webhook ||
@@ -164,10 +191,13 @@ const from = env('RETELL_FROM_NUMBER');
 if (from) {
   try {
     const number = await retell('GET', `/get-phone-number/${encodeURIComponent(from)}`);
+    const list = (key: string) =>
+      (Array.isArray(number[key]) ? (number[key] as Rec[]) : [])
+        .map((a) => `${String(a['agent_id'])}@${JSON.stringify(a['agent_version'])}`)
+        .join(', ') || '-';
     console.log(
-      `\nnumber …${from.slice(-2)}: outbound agent ${String(number['outbound_agent_id'])} ` +
-        `(version ${JSON.stringify(number['outbound_agent_version'] ?? 'latest')}), inbound agent ` +
-        `${String(number['inbound_agent_id'])} (version ${JSON.stringify(number['inbound_agent_version'] ?? 'latest')})`,
+      `\nnumber …${from.slice(-2)}: inbound ${list('inbound_agents')}; default outbound ` +
+        `${list('outbound_agents')} (outbound calls override this with the fleet agent's latest_published)`,
     );
   } catch (error) {
     console.log(`\n(could not read phone number binding: ${String(error).slice(0, 120)})`);

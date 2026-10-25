@@ -79,6 +79,7 @@ const engine = createEngine({
   voice,
   dispatcherPhone: process.env['DISPATCHER_PHONE'] ?? null,
   simulatedOfferMs: config.SIMULATED_OFFER_MS,
+  offerRetryMs: config.OFFER_RETRY_MS,
 });
 
 const app = createApp({

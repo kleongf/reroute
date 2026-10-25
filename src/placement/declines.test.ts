@@ -135,17 +135,46 @@ describe('Declines, Unanswered, Escalation', () => {
     });
   });
 
-  it('call_ended on a pending Offer marks it Unanswered and moves on', async () => {
+  it('an Unanswered Offer is retried once after a delay, then the Placement moves on', async () => {
     const offer = await reachCasey();
     const res = await h.post('/webhooks/retell', {
       event: 'call_ended',
       call: { call_id: offer.callId },
     });
     expect(res.status).toBe(204);
-    const p = placementOf(await h.state());
+    let p = placementOf(await h.state());
     expect(p.offers[1]).toMatchObject({ status: 'unanswered', declineReason: null });
+    // No immediate retry and no Escalation: the retry waits for its delay.
+    expect(p.status).toBe('running');
+    expect(h.voice.calls.map((c) => c.kind)).toEqual(['offer']);
+
+    expect(await h.runScheduled()).toBe(1);
+    p = placementOf(await h.state());
+    expect(p.offers.map((o) => [o.driverId, o.status])).toEqual([
+      ['blair', 'declined'],
+      ['casey', 'unanswered'],
+      ['casey', 'pending'],
+    ]);
+    expect(h.voice.calls.map((c) => [c.kind, c.vars['driver_id']])).toEqual([
+      ['offer', 'casey'],
+      ['offer', 'casey'],
+    ]);
+
+    // A second Unanswered is final for Casey: nobody else is Eligible, so Escalate.
+    const retry = p.offers[2];
+    await h.post('/webhooks/retell', { event: 'call_ended', call: { call_id: retry?.callId } });
+    p = placementOf(await h.state());
     expect(p.status).toBe('escalated');
-    expect(h.voice.calls.map((c) => c.kind)).toEqual(['offer', 'escalation']);
+    expect(h.voice.calls.map((c) => c.kind)).toEqual(['offer', 'offer', 'escalation']);
+  });
+
+  it('a retry scheduled before a demo reset does nothing after it', async () => {
+    const offer = await reachCasey();
+    await h.post('/webhooks/retell', { event: 'call_ended', call: { call_id: offer.callId } });
+    await h.post('/api/reset');
+    await h.runScheduled();
+    expect((await h.state()).placements).toEqual([]);
+    expect(h.voice.calls.map((c) => c.kind)).toEqual(['offer']);
   });
 
   it('call_ended after accept or decline changes nothing', async () => {

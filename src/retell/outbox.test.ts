@@ -116,10 +116,13 @@ describe('outbound voice outbox', () => {
   });
   it('hands a failed outbound Offer back to the engine as Unanswered so Placement can progress', async () => {
     const calls: CallRequest[] = [];
+    const scheduled: (() => Promise<void>)[] = [];
     const engine = createEngine({
       store: h.store,
       clock: h.clock,
       dispatcherPhone: null,
+      offerRetryMs: 0,
+      schedule: (fn) => scheduled.push(fn),
       voice: {
         placeCall(call) {
           if (!outbox) throw new Error('Missing outbox');
@@ -141,8 +144,11 @@ describe('outbound voice outbox', () => {
     });
     await engine.reportDisruption('alex', 'J17', 'flat tire', false);
     for (let attempt = 0; attempt < 3; attempt++) await outbox.flush();
+    // Undeliverable is Unanswered: one retried Offer, delivered three more times, then final.
+    for (const fn of scheduled.splice(0)) await fn();
+    for (let attempt = 0; attempt < 3; attempt++) await outbox.flush();
     const state = await h.state();
-    expect(calls).toHaveLength(3);
+    expect(calls).toHaveLength(6);
     expect(state.placements[0]?.status).toBe('escalated');
     expect(state.placements[0]?.offers[0]?.status).toBe('unanswered');
     expect(state.jobs.find((job) => job.id === 'J17')?.driverId).toBe('alex');

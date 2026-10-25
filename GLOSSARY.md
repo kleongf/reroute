@@ -67,7 +67,7 @@ One spoken proposal of one Job to one Driver. Ends as Accepted, Declined, or Una
 _Avoid_: Request, ask, proposal
 
 **Unanswered**:
-An Offer that reached voicemail, was not picked up, or got no clear answer after one clarification. Treated like a Decline without a reason.
+An Offer that reached voicemail, was not picked up, or got no clear answer after one clarification. The Driver is called once more after a short delay; a second Unanswered is treated like a Decline without a reason.
 _Avoid_: Timeout, missed
 
 **Escalation**:

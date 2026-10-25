@@ -57,6 +57,7 @@ export function createHarness(phones: PhoneBook = HARNESS_PHONES): Harness {
     voice,
     dispatcherPhone: phones['DISPATCHER_PHONE'] ?? null,
     simulatedOfferMs: 0,
+    offerRetryMs: 0,
     schedule: (fn) => scheduled.push(fn),
   });
   const app = createApp({

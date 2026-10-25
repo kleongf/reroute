@@ -60,6 +60,9 @@ export interface StatusUpdate {
   availableUntil?: string;
 }
 
+/** Calls per Driver per Placement: the first Offer plus one retry after Unanswered. */
+export const MAX_OFFER_ATTEMPTS = 2;
+
 /** Simulated Offers (Blair) always get this scripted reply. */
 export const SIMULATED_DECLINE = { reason: 'only room for one', update: { capacity: 1 } };
 
@@ -70,6 +73,8 @@ export interface EngineDeps {
   dispatcherPhone: string | null;
   /** Delay before a simulated Offer resolves itself (SIMULATED_OFFER_MS, default 4000). */
   simulatedOfferMs?: number;
+  /** Delay before an Unanswered Offer's Driver is called once more (OFFER_RETRY_MS, default 20000). */
+  offerRetryMs?: number;
   /** Runs `fn` after `ms`; injectable so tests can resolve simulated Offers on demand. */
   schedule?: (fn: () => Promise<void>, ms: number) => void;
 }
@@ -85,6 +90,7 @@ export function createEngine({
   voice,
   dispatcherPhone,
   simulatedOfferMs = 4000,
+  offerRetryMs = 20_000,
   schedule = defaultSchedule,
 }: EngineDeps): Engine {
   const nowIso = () => clock.now().toISOString();
@@ -108,8 +114,15 @@ export function createEngine({
       pendingOfferDriverIds: offers
         .filter((o) => o.placementId !== placement.id)
         .map((o) => o.driverId),
+      // A Driver whose only Offer so far went Unanswered gets one more try (a missed ring
+      // on stage shouldn't end the Placement); a decline or a second Unanswered is final.
       alreadyOfferedDriverIds: w.offers
         .filter((o) => o.placementId === placement.id && o.id !== recheckOfferId)
+        .filter(
+          (o, _, mine) =>
+            o.status !== 'unanswered' ||
+            mine.filter((m) => m.driverId === o.driverId).length >= MAX_OFFER_ATTEMPTS,
+        )
         .map((o) => o.driverId),
       trafficMinutes,
     });
@@ -238,6 +251,19 @@ export function createEngine({
     };
   }
 
+  /** Re-runs the Offer step for a Placement after an Unanswered Offer, unless the demo moved on. */
+  function scheduleRetry(placementId: string, resetAt: string): void {
+    schedule(async () => {
+      const w = store.get();
+      if (w.resetAt !== resetAt) return;
+      if (w.placements.find((p) => p.id === placementId)?.status !== 'running') return;
+      // Another Offer may already be out (e.g. a decline arrived meanwhile); don't stack calls.
+      if (w.offers.some((o) => o.placementId === placementId && o.status === 'pending')) return;
+      await makeOffer(placementId);
+      await startNext();
+    }, offerRetryMs);
+  }
+
   /** Blair's Offer never reaches VoicePort: it declines itself with the scripted reply. */
   function scheduleSimulatedReply(offerId: OfferId, resetAt: string): void {
     schedule(async () => {
@@ -272,7 +298,7 @@ export function createEngine({
     reason: string | null,
     update: StatusUpdate,
   ): Promise<CommandResult> {
-    const outcome = store.update((w): CommandResult & { next?: string } => {
+    const outcome = store.update((w): CommandResult & { next?: string; retry?: string } => {
       const offer = w.offers.find((o) => o.id === offerId);
       if (!offer) return { ok: false, message: "I can't find that offer." };
       if (offer.status !== 'pending') {
@@ -297,6 +323,13 @@ export function createEngine({
           ? `${name} declined Offer ${offer.id}${detail ? ` (${detail})` : ''}`
           : `Offer ${offer.id} to ${name} Unanswered`,
       );
+      const attempts = w.offers.filter(
+        (o) => o.placementId === offer.placementId && o.driverId === offer.driverId,
+      ).length;
+      if (status === 'unanswered' && attempts < MAX_OFFER_ATTEMPTS) {
+        log(w, `Calling ${name} again in ${String(Math.round(offerRetryMs / 1000))}s`);
+        return { ok: true, retry: offer.placementId, message: 'Offer Unanswered; retrying.' };
+      }
       return {
         ok: true,
         next: offer.placementId,
@@ -304,6 +337,7 @@ export function createEngine({
       };
     });
     if (outcome.next) await makeOffer(outcome.next);
+    if (outcome.retry) scheduleRetry(outcome.retry, store.get().resetAt);
     return { ok: outcome.ok, message: outcome.message };
   }
 

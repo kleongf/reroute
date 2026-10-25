@@ -39,7 +39,7 @@ Phone screen automation, live GPS, notifying anyone outside the fleet (shops, re
 - Eligibility, all required: availability window covers Pickup through drop-off; free capacity ≥ parcel count; fixture ETA to Pickup + service + trip meets the deadline; no pending Offer elsewhere. Every ineligible Driver gets a one-line reason shown on the dashboard ("off at 3:00", "1 slot < 2 parcels").
 - Rank Eligible Drivers by ETA to Pickup; ties by Driver ID.
 - Offers go one at a time by outbound call. An Offer states Job, Pickup location, deadline, and parcel count.
-- Declined with a reason → update that Driver's record (capacity/availability), then re-rank before the next Offer. Unanswered (voicemail, no pickup, unclear after one clarification) → next Driver. Each Driver gets one Offer per Placement.
+- Declined with a reason → update that Driver's record (capacity/availability), then re-rank before the next Offer. Unanswered (voicemail, no pickup, unclear after one clarification) → call the same Driver once more after `OFFER_RETRY_MS` (default 20 s); a second Unanswered → next Driver. A decline is final: each Driver gets at most one answered Offer and two calls per Placement.
 - Accepted → recheck eligibility and versions, commit the assignment in one transaction → Placed. Reroute then calls the previous Driver (if any): "Casey has the Oak Street job; you're off it."
 - No Eligible Driver left → Escalated: Reroute calls the Dispatcher with one sentence. A Late Job stays with its current Driver.
 

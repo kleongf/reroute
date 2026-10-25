@@ -17,8 +17,11 @@ function signature(raw: string, time: number) {
 describe('authenticated Retell HTTP boundary', () => {
   let h: Harness;
   let app: ReturnType<typeof createApp>;
+  /** This file's engine schedules Offer retries here instead of on a real timer. */
+  let scheduled: (() => Promise<void>)[] = [];
   beforeEach(() => {
     h = createHarness();
+    scheduled = [];
     app = createApp({
       db: h.db,
       clock: h.clock,
@@ -29,6 +32,8 @@ describe('authenticated Retell HTTP boundary', () => {
         clock: h.clock,
         voice: h.voice,
         dispatcherPhone: HARNESS_PHONES['DISPATCHER_PHONE'] ?? null,
+        offerRetryMs: 0,
+        schedule: (fn) => scheduled.push(fn),
       }),
       scenario: readScenarioFile(
         fileURLToPath(new URL('../../fixtures/demo.json', import.meta.url)),
@@ -250,14 +255,26 @@ describe('authenticated Retell HTTP boundary', () => {
       call: { call_id: call?.callId, retell_llm_dynamic_variables: call?.vars },
     };
     expect((await post('/webhooks/retell', ended)).status).toBe(204);
+    expect((await h.state()).placements[0]?.offers[0]?.status).toBe('unanswered');
+    // One retry of the same Driver after a delay; its call-ended is final.
+    expect(scheduled).toHaveLength(1);
+    for (const fn of scheduled.splice(0)) await fn();
+    const retry = h.voice.calls[1];
+    expect(retry?.kind).toBe('offer');
+    const retryEnded = {
+      event: 'call_ended',
+      call: { call_id: retry?.callId, retell_llm_dynamic_variables: retry?.vars },
+    };
+    expect((await post('/webhooks/retell', retryEnded)).status).toBe(204);
     const state = await h.state();
-    expect(state.placements[0]?.offers[0]?.status).toBe('unanswered');
+    expect(state.placements[0]?.offers.map((o) => o.status)).toEqual(['unanswered', 'unanswered']);
     expect(state.placements[0]?.status).toBe('escalated');
     expect(state.jobs.find((job) => job.id === 'J17')?.driverId).toBe('alex');
-    expect(h.voice.calls.map((placed) => placed.kind)).toEqual(['offer', 'escalation']);
+    expect(h.voice.calls.map((placed) => placed.kind)).toEqual(['offer', 'offer', 'escalation']);
     await post('/webhooks/retell', ended);
+    await post('/webhooks/retell', retryEnded);
     expect(await h.state()).toEqual(state);
-    expect(h.voice.calls).toHaveLength(2);
+    expect(h.voice.calls).toHaveLength(3);
   });
 
   it('decline status and inbound status retries preserve capacity and do not bump versions twice', async () => {
