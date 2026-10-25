@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTranscriptBus } from '../events/transcripts.ts';
 import { createHarness, HARNESS_PHONES, type Harness } from '../testing/harness.ts';
@@ -11,6 +12,41 @@ describe('Retell call events', () => {
   });
   afterEach(() => {
     h.close();
+  });
+
+  it('publishes the real root-level streamed transcript, skipping tool entries and duplicate deliveries', async () => {
+    const raw: unknown = JSON.parse(
+      readFileSync(
+        new URL('../../fixtures/retell/tracer-call/transcript_updated.json', import.meta.url),
+        'utf8',
+      ),
+    );
+    const event = retellWebhookSchema.parse(raw);
+    const utterances = event.transcript_with_tool_calls?.filter(
+      (entry) => entry.role === 'agent' || entry.role === 'user',
+    );
+    expect(utterances?.length).toBeGreaterThan(0);
+    const transcripts = createTranscriptBus();
+    const observed: string[] = [];
+    const unsubscribe = transcripts.subscribe((entry) => {
+      observed.push(entry.text);
+    });
+    const deps = {
+      store: h.store,
+      clock: h.clock,
+      engine: { markUnanswered: () => Promise.resolve() },
+      transcripts,
+    };
+    await handleRetellEvent(event, deps);
+    await handleRetellEvent(event, deps);
+    expect(transcripts.entries().map((entry) => entry.text)).toEqual(
+      utterances?.map((entry) => entry.content),
+    );
+    expect(observed).toHaveLength(utterances?.length ?? 0);
+    expect(transcripts.entries().map((entry) => entry.utteranceId)).toEqual(
+      utterances?.map((_, index) => `${event.call.call_id}:${String(index)}`),
+    );
+    unsubscribe();
   });
 
   it('publishes incremental transcript revisions without duplicate utterances', async () => {

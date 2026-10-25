@@ -1,4 +1,4 @@
-import type { LatLng } from '../domain/types.ts';
+import type { EtaSource, LatLng } from '../domain/types.ts';
 
 /** Travel time between points from a routing service. Rejects on any failure or timeout. */
 export interface RoutingPort {
@@ -9,6 +9,8 @@ export interface RoutingPort {
    * Lets one request replace many against rate-limited services.
    */
   table?(sources: LatLng[], destinations: LatLng[]): Promise<(number | null)[][]>;
+  /** Provenance written for this port's answers. Default 'routed'; 'traffic' = live-traffic-aware. */
+  readonly source?: Exclude<EtaSource, 'fixture'>;
 }
 
 /** Test double: answers from `fn`; throw from it to simulate an outage. Records every call. */
