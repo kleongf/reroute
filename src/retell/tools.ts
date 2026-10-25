@@ -5,16 +5,7 @@ import { parseSpokenTime, spokenTime } from '../domain/time.ts';
 import type { Engine, StatusUpdate } from '../placement/engine.ts';
 import type { Store } from '../store/store.ts';
 
-/** Retell custom-function payload. Loose for now; the real schema lands in #6. */
-const toolCallSchema = z.looseObject({
-  name: z.string().optional(),
-  call: z.looseObject({
-    call_id: z.string().min(1),
-    from_number: z.string().optional(),
-    retell_llm_dynamic_variables: z.record(z.string(), z.string()).optional(),
-  }),
-  args: z.looseObject({}).default({}),
-});
+import { retellToolSchema as toolCallSchema } from './schemas.ts';
 
 const reportDisruptionArgs = z.object({
   driver_id: z.string().min(1).optional(),
