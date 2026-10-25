@@ -28,7 +28,7 @@ describe('routed ETAs', () => {
 
   it('labels every ETA fixture when routing is off', async () => {
     const s = await h.state();
-    expect(s.etas.minutes['alex']?.['J17']).toBe(10);
+    expect(s.etas.minutes['alex']?.['J17']).toBe(14);
     expect(s.etas.source['alex']?.['J17']).toBe('fixture');
     expect(Object.values(s.etas.source).flatMap(Object.values)).not.toContain('routed');
   });
@@ -239,7 +239,7 @@ describe('TomTom routing', () => {
       await h.post('/api/reset');
       await r.settled();
       s = await h.state();
-      expect(s.etas.minutes['alex']?.['J17']).toBe(10);
+      expect(s.etas.minutes['alex']?.['J17']).toBe(14);
       expect(s.etas.source['alex']?.['J17']).toBe('fixture');
     } finally {
       h.close();

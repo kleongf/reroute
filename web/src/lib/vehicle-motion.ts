@@ -36,6 +36,7 @@ export interface Target {
  * (so a freshly accepted Offer takes over), then the shortest ETA, then Job ID.
  */
 export function chooseTarget(snapshot: StateSnapshot, driverId: DriverId): Target | null {
+  if (snapshot.drivers.find((d) => d.id === driverId)?.holdPosition) return null;
   const placedAt = new Map<JobId, string>();
   for (const p of snapshot.placements) {
     if (p.status === 'placed' && p.endedAt !== null) placedAt.set(p.jobId, p.endedAt);

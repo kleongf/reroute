@@ -7,6 +7,7 @@ import { useNewlyFixed, useServerNow } from './disruptions/hooks.ts';
 import { deliveryText, disruptionModel, mmss, type DisruptionModel } from './disruptions/model.ts';
 import type { DashboardProps } from './types.ts';
 import './disruptions/disruptions.css';
+import { DriverTraffic, JobTiming } from './demo/job-timing.tsx';
 
 type CardStatus = DisruptionSummary['status'] | 'at_risk';
 
@@ -44,6 +45,7 @@ function DisruptionCard(props: {
   time?: ReactNode;
   timeTestId?: boolean;
   celebrate?: boolean;
+  details?: ReactNode;
 }) {
   return (
     <Card
@@ -70,6 +72,7 @@ function DisruptionCard(props: {
       <div data-testid="disruption-reason" className="text-sm text-muted-foreground">
         {props.reason}
       </div>
+      {props.details}
       <div className="grid grid-cols-[auto_1fr] items-baseline gap-x-2 font-semibold">
         {props.before !== undefined && (
           <>
@@ -105,6 +108,7 @@ function reportedCard(
   celebrate: boolean,
 ) {
   const who = m.driverName(d.driverId);
+  const job = m.job(d.jobId);
   const before =
     d.before.minutesLate !== null && d.before.minutesLate > 0
       ? deliveryText(d.before.minutesLate, who)
@@ -117,6 +121,12 @@ function reportedCard(
     before,
     timeTestId: true,
     celebrate,
+    details: (
+      <>
+        <DriverTraffic snapshot={m.s} driverId={d.driverId} />
+        {job && <JobTiming snapshot={m.s} job={job} />}
+      </>
+    ),
   };
   if (d.status === 'placed' && d.after) {
     return (
@@ -168,6 +178,12 @@ function atRiskCard(m: DisruptionModel, job: Job) {
       tag="At Risk"
       title={`${job.id} ${job.label}`}
       reason={job.note ?? 'traffic check'}
+      details={
+        <>
+          <DriverTraffic snapshot={m.s} driverId={job.driverId} />
+          <JobTiming snapshot={m.s} job={job} />
+        </>
+      }
       before={f ? deliveryText(f.minutesLate, who) : `with ${who}`}
       after={`Checking with ${who}…`}
       afterTone="working"
@@ -213,6 +229,18 @@ export function DisruptionCards({ snapshot }: DashboardProps) {
       {cards.length === 0 ? (
         <Card className="px-3 py-2 text-sm text-muted-foreground shadow-lg">
           No Disruptions. Every Job is on track.
+          {snapshot.jobs
+            .filter((job) => job.status === 'assigned')
+            .sort((a, b) => a.deadline.localeCompare(b.deadline))
+            .slice(0, 1)
+            .map((job) => (
+              <div key={job.id} className="mt-2 space-y-1">
+                <b>
+                  {job.id} {job.label}
+                </b>
+                <JobTiming snapshot={snapshot} job={job} />
+              </div>
+            ))}
         </Card>
       ) : (
         cards

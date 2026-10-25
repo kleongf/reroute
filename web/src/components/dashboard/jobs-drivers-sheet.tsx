@@ -20,6 +20,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { DashboardProps } from './types.ts';
 import { UrgentJobDialog } from './urgent-job-dialog.tsx';
+import { DriverTraffic, JobTiming } from './demo/job-timing.tsx';
 
 const DEMO_TIME_ZONE = 'America/Los_Angeles';
 
@@ -122,6 +123,7 @@ export function JobsDriversSheet({ snapshot }: DashboardProps) {
                   <TableRow key={j.id} data-status={j.status}>
                     <TableCell>
                       <span className="font-medium">{j.id}</span> {j.label}
+                      <JobTiming snapshot={snapshot} job={j} />
                     </TableCell>
                     <TableCell className="whitespace-normal">
                       <Badge variant={STATUS_VARIANT[j.status]}>{STATUS_LABEL[j.status]}</Badge>
@@ -146,7 +148,10 @@ export function JobsDriversSheet({ snapshot }: DashboardProps) {
               <TableBody>
                 {snapshot.drivers.map((d) => (
                   <TableRow key={d.id}>
-                    <TableCell className="font-medium">{d.name}</TableCell>
+                    <TableCell className="font-medium">
+                      {d.name}
+                      <DriverTraffic snapshot={snapshot} driverId={d.id} />
+                    </TableCell>
                     <TableCell>
                       <PhoneCell driver={d} />
                     </TableCell>

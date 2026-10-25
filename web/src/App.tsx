@@ -31,10 +31,10 @@ export function App() {
           <div className="stage-overlay absolute inset-x-3 top-3 z-10">
             <TopBar snapshot={snapshot} transcripts={transcripts} />
           </div>
-          <div className="stage-overlay absolute top-24 left-3 z-10 w-96 max-w-[calc(100vw-1.5rem)]">
+          <div className="stage-overlay absolute top-32 left-3 z-10 w-96 max-w-[calc(100vw-1.5rem)]">
             <DisruptionCards snapshot={snapshot} transcripts={transcripts} />
           </div>
-          <div className="stage-overlay absolute top-24 right-3 z-10 w-80 max-w-[calc(100vw-1.5rem)]">
+          <div className="stage-overlay absolute top-32 right-3 z-10 w-80 max-w-[calc(100vw-1.5rem)]">
             <PlacementCard snapshot={snapshot} transcripts={transcripts} />
           </div>
           <div className="stage-overlay absolute bottom-3 left-3 z-10 w-96 max-w-[calc(100vw-1.5rem)]">

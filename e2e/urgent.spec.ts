@@ -103,16 +103,16 @@ test.describe('traffic menu', () => {
 
     const menu = page.getByTestId('traffic-buttons');
     await expect(menu).toBeVisible();
-    const item = menu.getByTestId('inject-traffic-i280');
+    const item = menu.getByTestId('inject-traffic-us101');
     await expect(item).toBeEnabled();
 
-    const posted = page.waitForResponse('**/api/traffic/i280');
+    const posted = page.waitForResponse('**/api/traffic/us101');
     await item.click();
     expect((await posted).ok()).toBe(true);
 
     // Await selection's close transition before reopening the controlled menu.
     await expect(menu).toBeHidden();
     await page.getByTestId('traffic-menu-trigger').click();
-    await expect(page.getByTestId('inject-traffic-i280')).toHaveAttribute('data-disabled', '');
+    await expect(page.getByTestId('inject-traffic-us101')).toHaveAttribute('data-disabled', '');
   });
 });

@@ -61,7 +61,7 @@ export interface StatusUpdate {
 }
 
 /** Simulated Offers (Blair) always get this scripted reply. */
-export const SIMULATED_DECLINE = { reason: 'only room for one', update: { capacity: 1 } };
+export const SIMULATED_DECLINE = { reason: 'my van’s full', update: { capacity: 0 } };
 
 export interface EngineDeps {
   store: Store;

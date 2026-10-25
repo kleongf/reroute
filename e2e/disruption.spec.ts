@@ -26,11 +26,13 @@ test('a Disruption is shown, then shown fixed with before → after and the tall
 
   // Traffic check: J17 At Risk with Alex, pulsing on the map.
   await page.getByTestId('traffic-menu-trigger').click();
-  await page.getByTestId('inject-traffic-i280').click();
+  await page.getByTestId('inject-traffic-us101').click();
   const card = page.getByTestId('disruption-card').filter({ hasText: 'J17' });
   await expect(card).toHaveAttribute('data-status', 'at_risk');
   await expect(card.getByTestId('disruption-before')).toHaveText(/Late by \d+ min with Alex/);
-  await expect(card.getByTestId('disruption-reason')).toContainText('I-280 closed');
+  await expect(card.getByTestId('disruption-reason')).toContainText(
+    'US-101 north closed at Cesar Chavez',
+  );
   await expect(page.getByTestId('banner')).toHaveAttribute('data-tone', 'risk');
   await expect(page.locator('.map-marker--pickup[data-health=trouble]')).toHaveCount(1);
   await page.waitForTimeout(600); // banner colour transition
@@ -40,20 +42,20 @@ test('a Disruption is shown, then shown fixed with before → after and the tall
   const reported = await request.post('/tools/report_disruption', {
     data: tool(
       'report_disruption',
-      { job_id: 'J17', reason: 'stuck behind the I-280 closure', collected: false },
+      { job_id: 'J17', reason: 'stuck behind the US-101 closure', collected: false },
       { from_number: TEST_SERVER_ENV.DRIVER_PHONE_ALEX },
     ),
   });
   expect(reported.ok()).toBe(true);
   await expect(card).toHaveAttribute('data-status', 'running');
   await expect(card.getByTestId('disruption-reason')).toContainText(
-    'Alex: “stuck behind the I-280 closure”',
+    'Alex: “stuck behind the US-101 closure”',
   );
   await expect(page.getByTestId('banner')).toHaveAttribute('data-tone', 'late');
 
   // Blair's simulated Offer declines itself; then the Offer goes to Casey.
   await expect(page.getByTestId('call-title')).toHaveText('Offer to Casey');
-  await expect(page.getByTestId('placement-panel')).toContainText('only room for one');
+  await expect(page.getByTestId('placement-panel')).toContainText('my van’s full');
   await page.waitForTimeout(600); // banner colour transition
   await page.screenshot({ path: 'artifacts/screenshots/disruption-placing.png' });
 

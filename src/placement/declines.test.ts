@@ -46,7 +46,7 @@ describe('Declines, Unanswered, Escalation', () => {
     return offer;
   }
 
-  it("Blair's simulated Offer declines itself with no call, sets her capacity to 1, then Casey is offered", async () => {
+  it("Blair's simulated Offer declines itself with no call, sets her capacity to 0, then Casey is offered", async () => {
     await h.post('/tools/report_disruption', disruption());
     expect(placementOf(await h.state()).offers).toMatchObject([
       { driverId: 'blair', simulated: true, status: 'pending' },
@@ -54,14 +54,14 @@ describe('Declines, Unanswered, Escalation', () => {
 
     await h.runScheduled();
     const s = await h.state();
-    expect(driver(s, 'blair')).toMatchObject({ capacity: 1, version: 2 });
+    expect(driver(s, 'blair')).toMatchObject({ capacity: 0, version: 2 });
     const p = placementOf(s);
     expect(p.offers).toMatchObject([
       {
         driverId: 'blair',
         simulated: true,
         status: 'declined',
-        declineReason: 'only room for one',
+        declineReason: 'my van’s full',
       },
       { driverId: 'casey', simulated: false, status: 'pending', callId: 'fake-call-1' },
     ]);
