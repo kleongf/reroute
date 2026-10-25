@@ -33,6 +33,8 @@ export function disruptionModel(s: StateSnapshot) {
     (j) => j.status === 'escalated' && !placementJobIds.has(j.id),
   );
   const forecast = (jobId: string) => s.forecasts.find((f) => f.jobId === jobId) ?? null;
+  /** Urgent Job Placements: not Disruptions, but the banner should still follow them. */
+  const urgent = s.placements.filter((p) => p.trigger === 'urgent_job');
   /** The pending Offer's Driver name if this Disruption's Placement is the running one. */
   const offeringTo = (d: DisruptionSummary) =>
     running?.id === d.placementId && pending ? driverName(pending.driverId) : null;
@@ -48,6 +50,7 @@ export function disruptionModel(s: StateSnapshot) {
     handoffs,
     forecast,
     offeringTo,
+    urgent,
   };
 }
 
@@ -77,7 +80,41 @@ export function banner(m: DisruptionModel): Banner {
       placementId: null,
     };
   }
+  const urgentRunning = m.urgent.find((p) => p.status === 'running');
+  if (urgentRunning) {
+    const offer = urgentRunning.offers.find((o) => o.status === 'pending');
+    const label = m.job(urgentRunning.jobId)?.label ?? '';
+    const doing = offer ? `offering to ${m.driverName(offer.driverId)}` : 'finding a Driver';
+    return {
+      tone: 'risk',
+      text: `${urgentRunning.jobId} ${label} · ${doing}`,
+      placementId: null,
+    };
+  }
+  // The latest ending wins, whether it was a Disruption or an Urgent Job.
+  const lastUrgent = m.urgent
+    .filter((p) => p.endedAt !== null)
+    .sort((a, b) => Date.parse(b.endedAt ?? '') - Date.parse(a.endedAt ?? ''))[0];
   const last = m.ended[0];
+  if (
+    lastUrgent &&
+    Date.parse(lastUrgent.endedAt ?? '') >= Date.parse(last?.endedAt ?? '1970-01-01')
+  ) {
+    const label = m.job(lastUrgent.jobId)?.label ?? '';
+    if (lastUrgent.status === 'placed') {
+      const accepted = lastUrgent.offers.find((o) => o.status === 'accepted');
+      return {
+        tone: 'fixed',
+        text: `${lastUrgent.jobId} ${label} · ${m.driverName(accepted?.driverId)} has it`,
+        placementId: lastUrgent.id,
+      };
+    }
+    return {
+      tone: 'esc',
+      text: `${lastUrgent.jobId} ${label} · Escalated to Dispatcher`,
+      placementId: null,
+    };
+  }
   if (last?.status === 'placed' && last.after) {
     const late = last.after.minutesLate;
     const how = late !== null && late > 0 ? `late by ${minutes(late)}` : 'on time';

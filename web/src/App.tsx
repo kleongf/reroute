@@ -1,17 +1,10 @@
-import { Badge } from '@/components/ui/badge';
 import { CallCard } from '@/components/dashboard/call-card.tsx';
 import { DisruptionCards } from '@/components/dashboard/disruption-cards.tsx';
 import { JobsDriversSheet } from '@/components/dashboard/jobs-drivers-sheet.tsx';
 import { MapStage } from '@/components/dashboard/map-stage.tsx';
 import { PlacementCard } from '@/components/dashboard/placement-card.tsx';
 import { TopBar } from '@/components/dashboard/top-bar.tsx';
-import { useSnapshot, type FeedStatus } from '@/hooks/use-snapshot.ts';
-
-const STATUS_VARIANT = {
-  connecting: 'secondary',
-  connected: 'default',
-  reconnecting: 'destructive',
-} as const satisfies Record<FeedStatus, 'default' | 'secondary' | 'destructive'>;
+import { useSnapshot } from '@/hooks/use-snapshot.ts';
 
 /**
  * Mission control layout: the map is the stage; every other region floats over it.
@@ -43,14 +36,25 @@ export function App() {
           <JobsDriversSheet snapshot={snapshot} transcripts={transcripts} />
         </>
       )}
-      <div className="absolute right-3 bottom-3 z-10 flex items-center gap-2 rounded-md bg-background/90 px-2 py-1 text-xs text-muted-foreground shadow">
-        <span>Live feed</span>
-        <Badge data-testid="sse-status" data-state={status} variant={STATUS_VARIANT[status]}>
+      {/* Presenter view: a quiet dot while live; words only when the feed drops.
+          Status, heartbeat count and Job count stay in the DOM for tests and debugging. */}
+      <div
+        className="absolute right-3 bottom-8 z-10 flex items-center gap-1.5 text-xs text-muted-foreground"
+        title={`Live feed ${status}`}
+      >
+        <span
+          aria-hidden
+          className={`size-2 rounded-full ${status === 'connected' ? 'bg-emerald-500' : 'animate-pulse bg-amber-500'}`}
+        />
+        <span
+          data-testid="sse-status"
+          data-state={status}
+          className={status === 'connected' ? 'sr-only' : ''}
+        >
           {status}
-        </Badge>
-        <span data-testid="sse-heartbeats">{heartbeats}</span>
-        <span>
-          · Jobs{' '}
+        </span>
+        <span className="sr-only">
+          heartbeats <span data-testid="sse-heartbeats">{heartbeats}</span>, Jobs{' '}
           <span data-testid="job-count">{snapshot === null ? '—' : snapshot.jobs.length}</span>
         </span>
       </div>
