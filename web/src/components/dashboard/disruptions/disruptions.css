@@ -1,0 +1,28 @@
+/* Celebration when a Disruption is fixed (banner and its card), and the Late banner pulse. */
+@keyframes reroute-celebrate {
+  0% {
+    box-shadow: 0 0 0 0 rgb(26 127 55 / 80%);
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.03);
+  }
+  100% {
+    box-shadow: 0 0 0 18px rgb(26 127 55 / 0%);
+    transform: scale(1);
+  }
+}
+
+@keyframes reroute-soft-pulse {
+  50% {
+    filter: brightness(1.18);
+  }
+}
+
+.reroute-celebrate {
+  animation: reroute-celebrate 0.9s ease-out 3;
+}
+
+.reroute-pulse {
+  animation: reroute-soft-pulse 1.6s infinite;
+}
