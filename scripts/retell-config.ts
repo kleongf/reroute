@@ -58,7 +58,8 @@ export function buildRetellConfig(baseUrl: string) {
     },
     {
       name: 'decline_offer',
-      description: 'Record a clear no and optional explicit status update before the next Offer.',
+      description:
+        'Only for call_kind=offer with a supplied Offer ID: decline that Offer. Never use for an at_risk_check; use report_disruption for a Driver who cannot complete their existing Job.',
       properties: {
         offer_id: { type: 'string' },
         reason: { type: 'string' },

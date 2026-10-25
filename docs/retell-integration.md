@@ -56,6 +56,10 @@ Backend tool responses still return quickly; the timeout allows network transit.
 Automatic voicemail detection is disabled to avoid cutting off screening; the
 prompt still treats actual voicemail and unclear replies as Unanswered. Default
 string variables permit inbound calls; outbound context overrides them.
+The prompt explicitly interpolates `call_kind` and the current Job/Offer IDs.
+An At Risk check must use `report_disruption` for a Driver who cannot complete
+their existing Job; Offer tools are restricted to actual Offers. After recording
+the check result, the agent ends the call so the release call can reach the Driver.
 
 ## Backend flow
 
