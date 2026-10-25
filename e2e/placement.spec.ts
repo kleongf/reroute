@@ -4,7 +4,7 @@ import { TEST_SERVER_ENV } from '../scripts/lib/app-process.ts';
 
 const tool = (name: string, args: Record<string, unknown>, call: Record<string, unknown> = {}) => ({
   name,
-  call: { call_id: `e2e-next-${name}`, ...call },
+  call: { call_id: `e2e-placement-${name}`, ...call },
   args,
 });
 
@@ -12,10 +12,10 @@ async function state(request: APIRequestContext): Promise<StateSnapshot> {
   return (await (await request.get('/api/state')).json()) as StateSnapshot;
 }
 
-test('/next Placement card, queue and call card: placing → placed', async ({ page, request }) => {
+test('Placement card, queue and call card: placing → placed', async ({ page, request }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   expect((await request.post('/api/reset')).ok()).toBe(true);
-  await page.goto('/next');
+  await page.goto('/');
   await expect(page.getByTestId('sse-status')).toHaveAttribute('data-state', 'connected');
 
   const panel = page.getByTestId('placement-panel');
@@ -43,7 +43,7 @@ test('/next Placement card, queue and call card: placing → placed', async ({ p
     page.getByTestId('ineligible-list').locator('.line-through', { hasText: 'Alex' }),
   ).toBeVisible();
   await expect(page.getByTestId('transcript')).toContainText('Calling…');
-  await page.screenshot({ path: 'artifacts/screenshots/next-placing.png' });
+  await page.screenshot({ path: 'artifacts/screenshots/placing.png' });
 
   const offer = (await state(request)).placements
     .at(-1)
@@ -60,7 +60,7 @@ test('/next Placement card, queue and call card: placing → placed', async ({ p
   await expect(page.getByTestId('placement-status')).toHaveAttribute('data-status', 'placed');
   await expect(page.getByTestId('placement-status')).toHaveText('Placed');
   await expect(page.getByTestId('eligible-list')).toContainText('Accepted');
-  await page.screenshot({ path: 'artifacts/screenshots/next-placed.png' });
+  await page.screenshot({ path: 'artifacts/screenshots/placed.png' });
 
   // Collapsible: the toggle hides and restores the body.
   const toggle = page.getByTestId('placement-toggle');

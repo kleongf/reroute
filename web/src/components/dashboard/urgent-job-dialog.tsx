@@ -48,13 +48,14 @@ interface Fields {
   tier: Tier;
 }
 
-const EMPTY: Fields = {
-  label: '',
-  pickup: '',
-  dropoff: '',
-  parcels: '1',
-  deadlineOffsetMin: '60',
-  tier: 'normal',
+/** Prefilled with the stage Urgent Job from docs/plan.md, so the presenter only confirms it. */
+const STAGE_JOB: Fields = {
+  label: 'Hospital samples',
+  pickup: 'SF General Lab',
+  dropoff: 'Mission Bay Clinic',
+  parcels: '2',
+  deadlineOffsetMin: '90',
+  tier: 'high',
 };
 
 const toBody = (f: Fields): UrgentJobBody => ({
@@ -69,7 +70,7 @@ const toBody = (f: Fields): UrgentJobBody => ({
 /** The Dispatcher's Urgent Job form: validated with the backend's schema, then `POST /api/jobs`. */
 export function UrgentJobDialog() {
   const [open, setOpen] = useState(false);
-  const [fields, setFields] = useState<Fields>(EMPTY);
+  const [fields, setFields] = useState<Fields>(STAGE_JOB);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -104,7 +105,7 @@ export function UrgentJobDialog() {
     })
       .then(async (res) => {
         if (res.ok) {
-          setFields(EMPTY);
+          setFields(STAGE_JOB);
           setOpen(false);
           return;
         }

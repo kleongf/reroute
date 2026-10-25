@@ -20,10 +20,6 @@ export default defineConfig(
     linterOptions: { reportUnusedDisableDirectives: 'error' },
   },
   {
-    files: ['public/**/*.js'],
-    languageOptions: { globals: globals.browser },
-  },
-  {
     files: ['src/**/*.ts', 'scripts/**/*.ts', 'e2e/**/*.ts', '*.config.ts', 'web/*.config.ts'],
     languageOptions: { globals: globals.node },
   },

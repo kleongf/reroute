@@ -1,6 +1,5 @@
 // Simulated vehicle movement for the map: visual only, never changes snapshot state or ETAs.
-// TypeScript port of public/vehicle-motion.js, logic unchanged (vehicle-motion.test.ts checks
-// both agree). Framework-, DOM- and Leaflet-free: call `update` with each snapshot and
+// Framework-, DOM- and Leaflet-free: call `update` with each snapshot and
 // `positionsAt` once per animation frame, passing a monotonic clock in ms.
 
 import type { DriverId, JobId, LatLng, StateSnapshot } from '@backend/domain/types.ts';

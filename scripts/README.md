@@ -14,13 +14,14 @@ Outputs (gitignored): `artifacts/screenshots/dashboard.png`, `artifacts/verify/s
 ## `pnpm dev`
 
 Runs the backend (`tsx watch`, port 3000) and the `web/` Vite dev server together. Open
-http://localhost:5173/next/ for the React dashboard with hot reload; Vite proxies `/api`,
-`/events`, `/tools`, `/webhooks`, `/health` to the backend (`BACKEND_URL` overrides). The
-built app is served by Hono at `/next`; `/` is still the `public/` dashboard.
+http://localhost:5173/ for the dashboard with hot reload; Vite proxies `/api`, `/events`,
+`/tools`, `/webhooks`, `/health` to the backend (`BACKEND_URL` overrides). The built app
+(`dist/web`) is served by Hono at `/`; `/next` redirects there.
 
 ## `pnpm ui:explore`
 
-Boots the app from source (tsx) on a free port, opens the dashboard in Chromium, runs steps,
+Builds `web/` into `dist/web`, boots the app from source (tsx) on a free port with fake Driver
+and Dispatcher phone numbers (calls go to FakeVoice), opens the dashboard at `/` in Chromium, runs steps,
 and writes everything to `artifacts/explore/<timestamp>/`:
 `NN-<name>.png` screenshots (always `initial` and `final`), `console.jsonl` (browser console,
 page errors, failed requests), `server.log`, `summary.json`, `explore.db`.

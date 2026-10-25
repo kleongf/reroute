@@ -1,11 +1,14 @@
 import 'leaflet/dist/leaflet.css';
 import './map/map.css';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { StateSnapshot } from '@backend/domain/types.ts';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { createLeafletMap, type LeafletMap } from './map/leaflet-map.ts';
 import type { DashboardProps } from './types.ts';
 
-/** Same fit padding as `/`: keeps points clear of the left and right card columns. */
+/** Fit padding: keeps points clear of the left and right card columns. */
 const PADDING_TOP_LEFT: [number, number] = [400, 90];
 const PADDING_BOTTOM_RIGHT: [number, number] = [380, 50];
 
@@ -27,6 +30,8 @@ export function MapStage({ snapshot }: DashboardProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const [moving, setMoving] = useState(false);
+  // Expanded hides the floating cards (see map.css) so the map has the whole screen.
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -49,8 +54,25 @@ export function MapStage({ snapshot }: DashboardProps) {
 
   return (
     // isolate: Leaflet panes use z-index 400+; keep them under the floating cards.
-    <div className="map-root isolate h-full w-full" data-testid="map" data-moving={String(moving)}>
+    <div
+      className={cn('map-root isolate h-full w-full', expanded && 'map-root--expanded')}
+      data-testid="map"
+      data-moving={String(moving)}
+    >
       <div ref={canvasRef} className="map-canvas" />
+      <Button
+        data-testid="map-expand"
+        variant="outline"
+        size="sm"
+        className="map-expand shadow"
+        aria-pressed={expanded}
+        onClick={() => {
+          setExpanded((e) => !e);
+        }}
+      >
+        {expanded ? <Minimize2 /> : <Maximize2 />}
+        {expanded ? 'Show panels' : 'Full map'}
+      </Button>
       <div className="map-provenance" data-testid="map-provenance">
         {provenanceLabel(snapshot, moving)}
       </div>

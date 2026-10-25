@@ -1,9 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
-import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { Clock } from './domain/clock.ts';
-import { registerNextApp } from './next-app.ts';
 import type { Engine } from './placement/engine.ts';
 import { createTranscriptBus } from './events/transcripts.ts';
 import { retellAuthentication } from './retell/auth.ts';
@@ -16,15 +14,14 @@ import { registerTools } from './retell/tools.ts';
 import { loadScenario, type PhoneBook, type Scenario } from './store/scenario.ts';
 import { toSnapshot, type Store } from './store/store.ts';
 import type { VoicePort } from './voice/port.ts';
+import { registerWebApp } from './web-app.ts';
 
 export interface AppDeps {
   readonly db: DatabaseSync;
   readonly clock: Clock;
   readonly heartbeatMs: number;
-  /** Directory holding the dashboard's static files. */
+  /** Directory holding the dashboard: the web/ build (dist/web), served at /. */
   readonly publicDir: string;
-  /** Directory holding the web/ build served at /next; omitted = no /next. */
-  readonly webDir?: string;
   readonly store: Store;
   readonly scenario: Scenario;
   readonly phones: PhoneBook;
@@ -141,8 +138,7 @@ export function createApp(deps: AppDeps): Hono {
     return c.body(null, 204);
   });
 
-  if (deps.webDir !== undefined) registerNextApp(app, deps.webDir);
-  app.use('/*', serveStatic({ root: deps.publicDir }));
+  registerWebApp(app, deps.publicDir);
 
   return app;
 }

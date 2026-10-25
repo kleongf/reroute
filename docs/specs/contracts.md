@@ -15,7 +15,7 @@ The seams between tickets. Each ticket owns one side of a seam; change a contrac
 | `src/routing/` | `RoutingPort` + `FakeRouting`, OSRM and TomTom implementations, `attachRoutedEtas()` background ETA refresh | types, store |
 | `src/retell/` | `RetellVoice implements VoicePort`, tool + event webhooks | engine, store |
 | `src/events/` | In-process bus; `/events` SSE emits `state` and `transcript` | store |
-| `public/` | Dashboard: renders `state` snapshots, posts to `/api/*` | HTTP only |
+| `web/` | Dashboard (React + shadcn/ui, Vite build in `dist/web`, served at `/` by `src/web-app.ts`): renders `state` snapshots, posts to `/api/*` | HTTP only; imports backend types and the Urgent Job zod schema |
 
 ## Domain types
 

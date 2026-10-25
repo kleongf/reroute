@@ -1,4 +1,4 @@
-/* Marker, line and label styles copied from public/map.css (the `/` map); stage layout is new. */
+/* Marker, line and label styles for the stage map. */
 .map-root {
   position: relative;
 }
@@ -11,6 +11,20 @@
 /* Muted tiles so trouble (red), fixed (green) and calls (blue) stand out on a projector. */
 .map-root .leaflet-tile-pane {
   filter: grayscale(0.75) brightness(1.05) contrast(0.9);
+}
+
+/* Full map: hide the floating cards (App's .stage-overlay regions); the expand button stays. */
+main:has(.map-root--expanded) .stage-overlay {
+  display: none;
+}
+
+/* Bottom centre, above the Jobs · Drivers toggle: no card covers it. */
+.map-expand {
+  position: absolute;
+  z-index: 1001;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .map-root .leaflet-control-zoom {
@@ -75,6 +89,33 @@
   text-shadow:
     0 0 3px #fff,
     0 0 3px #fff;
+}
+
+/* Driver names sit left of the dot, Job labels right: a Driver on a Pickup stays readable. */
+.map-marker--driver .map-marker__label {
+  left: auto;
+  right: 14px;
+}
+
+/* Set by declutter() in leaflet-map.ts when a label would overlap another one. */
+.map-marker .map-label--below {
+  transform: translateY(17px);
+}
+
+.map-marker .map-label--above {
+  transform: translateY(-17px);
+}
+
+.map-marker .map-label--below-2 {
+  transform: translateY(34px);
+}
+
+.map-marker .map-label--above-2 {
+  transform: translateY(-34px);
+}
+
+.map-marker .map-label--hidden {
+  visibility: hidden;
 }
 
 /* Job health: trouble pulses red, fixed turns green. */

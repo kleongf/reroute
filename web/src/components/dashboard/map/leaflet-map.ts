@@ -1,5 +1,5 @@
 // Leaflet glue for MapStage: Drivers, Pickups, drop-offs, assignment and pending-Offer lines,
-// active traffic. A port of public/map.js; React owns the provenance label, this owns the map.
+// active traffic. React owns the provenance label, this owns the map.
 // Positions are simulated; movement comes from lib/vehicle-motion.ts.
 
 import L from 'leaflet';
@@ -30,6 +30,55 @@ function decorate(marker: L.Marker, kind: string, text: string) {
   el.dataset['kind'] = kind;
   const label = el.querySelector('.map-marker__label');
   if (label) label.textContent = text;
+}
+
+/** Where a label may go, tried in order: beside its dot, then below, then above. */
+const LABEL_SLOTS = [
+  '',
+  'map-label--below',
+  'map-label--above',
+  'map-label--below-2',
+  'map-label--above-2',
+] as const;
+const DECLUTTER_EVERY_MS = 200;
+
+/** Jobs in trouble or just fixed keep their spot first, then Drivers, then the rest. */
+function labelRank(label: HTMLElement): number {
+  const marker = label.parentElement;
+  if (marker?.dataset['health'] === 'trouble' || marker?.dataset['health'] === 'fixed') return 2;
+  return marker?.dataset['kind'] === 'driver' ? 1 : 0;
+}
+
+/**
+ * Moves marker labels that overlap another label or dot (a Driver sitting on a Pickup, two
+ * drop-offs side by side) one or two lines below or above their dot; a label with no free slot
+ * is hidden until it has one.
+ */
+function declutter(container: HTMLElement) {
+  const labels = [...container.querySelectorAll<HTMLElement>('.map-marker__label')];
+  for (const l of labels) l.classList.remove(...LABEL_SLOTS.filter(Boolean), 'map-label--hidden');
+  labels.sort((a, b) => labelRank(b) - labelRank(a));
+  // Dots, the "awaiting acceptance" tooltip and traffic labels are obstacles too.
+  const placed = [
+    ...container.querySelectorAll('.map-marker__dot, .map-pending-label, .map-traffic-label'),
+  ].map((d) => d.getBoundingClientRect());
+  const free = (r: DOMRect) =>
+    placed.every(
+      (p) => r.right <= p.left || r.left >= p.right || r.bottom <= p.top || r.top >= p.bottom,
+    );
+  for (const label of labels) {
+    const slot = LABEL_SLOTS.find((s) => {
+      if (s) label.classList.add(s);
+      const rect = label.getBoundingClientRect();
+      if (free(rect)) {
+        placed.push(rect);
+        return true;
+      }
+      if (s) label.classList.remove(s);
+      return false;
+    });
+    if (slot === undefined) label.classList.add('map-label--hidden');
+  }
 }
 
 function prefersReducedMotion() {
@@ -64,6 +113,10 @@ export function createLeafletMap(canvas: HTMLElement, options: MapOptions = {}):
   let driverLines: { driverId: string; line: L.Polyline; to: [number, number] }[] = [];
   let frame = 0;
   let moving = false;
+  let decluttered = 0;
+  map.on('zoomend moveend', () => {
+    declutter(canvas);
+  });
 
   const setMoving = (next: boolean) => {
     if (next === moving) return;
@@ -91,6 +144,10 @@ export function createLeafletMap(canvas: HTMLElement, options: MapOptions = {}):
     for (const { driverId, line, to } of driverLines) {
       const p = positions.get(driverId);
       if (p) line.setLatLngs([ll(p.position), to]);
+    }
+    if (performance.now() - decluttered > DECLUTTER_EVERY_MS) {
+      declutter(canvas);
+      decluttered = performance.now();
     }
     const anyMoving = [...positions.values()].some((p) => p.moving);
     setMoving(anyMoving);
@@ -206,6 +263,8 @@ export function createLeafletMap(canvas: HTMLElement, options: MapOptions = {}):
       }
       if (frame !== 0) cancelAnimationFrame(frame);
       animate();
+      declutter(canvas);
+      decluttered = performance.now();
     },
 
     destroy() {

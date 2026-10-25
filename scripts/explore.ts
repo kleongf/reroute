@@ -3,6 +3,7 @@
  * screenshots + browser console + server logs under artifacts/explore/<timestamp>/.
  * See scripts/README.md for usage.
  */
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { chromium, type Page } from '@playwright/test';
@@ -85,6 +86,8 @@ async function main(): Promise<number> {
   let app: RunningApp | undefined;
   let baseUrl = options.url;
   if (baseUrl === undefined) {
+    // The server serves the web/ build from dist/web at /.
+    execFileSync('pnpm', ['--filter', '@reroute/web', 'build'], { stdio: 'ignore' });
     app = await startApp({
       nodeArgs: ['--import', 'tsx', 'src/server.ts'],
       port: await getFreePort(),

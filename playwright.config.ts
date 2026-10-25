@@ -24,7 +24,7 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   ...(externalBaseUrl === undefined && {
     webServer: {
-      command: 'node --import tsx src/server.ts',
+      command: 'pnpm --filter @reroute/web build && node --import tsx src/server.ts',
       url: `http://127.0.0.1:${String(LOCAL_PORT)}/health`,
       env: {
         ...TEST_SERVER_ENV,

@@ -48,8 +48,8 @@ export function createHarness(phones: PhoneBook = HARNESS_PHONES): Harness {
     fileURLToPath(new URL('../../fixtures/demo.json', import.meta.url)),
   );
   const store = createStore(db, loadScenario(scenario, clock.now(), phones));
-  const publicDir = mkdtempSync(join(tmpdir(), 'reroute-public-'));
-  writeFileSync(join(publicDir, 'index.html'), '<h1>Reroute</h1>');
+  const webDir = mkdtempSync(join(tmpdir(), 'reroute-web-'));
+  writeFileSync(join(webDir, 'index.html'), '<h1>Reroute</h1>');
   const scheduled: (() => Promise<void>)[] = [];
   const engine = createEngine({
     store,
@@ -63,7 +63,7 @@ export function createHarness(phones: PhoneBook = HARNESS_PHONES): Harness {
     db,
     clock,
     heartbeatMs: 1_000,
-    publicDir,
+    publicDir: webDir,
     store,
     scenario,
     phones,
