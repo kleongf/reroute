@@ -39,6 +39,30 @@ The prompts are committed in `src/retell/prompts/` and cover all call kinds and
 inbound Driver status/Disruption calls. Never treat silence, voicemail, or an
 unclear reply after one clarification as acceptance.
 
+## Stable tunnel and pointing the agent
+
+Retell calls the backend from its cloud, so tool URLs must point at a public URL that
+does not change. Free Pinggy/trycloudflare hostnames rotate on restart; once that
+happens every tool call fails with `ENOTFOUND` and the agent falls back to "the
+Dispatcher can help". Use ngrok's free static domain (claim it under ngrok dashboard
+→ Domains):
+
+```sh
+ngrok http --url=<your-static-domain>.ngrok-free.app 3000
+```
+
+Set `PUBLIC_BASE_URL=https://<your-static-domain>.ngrok-free.app` in `.env`, start the
+server, then point the fleet agent(s) at it (dry run first; `--apply` refuses unless
+`/health` answers through the tunnel, sends the complete tool list, and reads it back):
+
+```sh
+pnpm retell:point            # show pending URL changes
+pnpm retell:point --apply    # write tool URLs + webhook URL, verify
+```
+
+After any test call, `pnpm retell:calls --limit 3` prints each tool call with the
+backend's exact result and latency, and exits non-zero if any tool call was rejected.
+
 ## Backend flow
 
 The server verifies `x-retell-signature` against the raw request body before JSON

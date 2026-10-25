@@ -26,7 +26,9 @@
     "ui:explore": "tsx scripts/explore.ts",
     "retell:tracer": "node --env-file-if-exists=.env scripts/retell-tracer.ts",
     "retell:export": "node --env-file-if-exists=.env scripts/retell-export.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "retell:calls": "node --env-file-if-exists=.env scripts/retell-calls.ts",
+    "retell:point": "node --env-file-if-exists=.env scripts/retell-point-agent.ts"
   },
   "lint-staged": {
     "*.{ts,tsx,js}": [
