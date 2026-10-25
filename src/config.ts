@@ -6,6 +6,7 @@ const envSchema = z.object({
   HEARTBEAT_MS: z.coerce.number().int().positive().default(15_000),
   VOICE_MODE: z.enum(['fake', 'retell']).default('fake'),
   RETELL_API_KEY: z.string().min(1).optional(),
+  RETELL_WEBHOOK_API_KEY: z.string().min(1).optional(),
   RETELL_FROM_NUMBER: z.string().optional(),
   RETELL_AGENT_ID: z.string().min(1).optional(),
   RETELL_AGENT_OFFER: z.string().min(1).optional(),

@@ -110,6 +110,8 @@ test.describe('traffic menu', () => {
     await item.click();
     expect((await posted).ok()).toBe(true);
 
+    // Await selection's close transition before reopening the controlled menu.
+    await expect(menu).toBeHidden();
     await page.getByTestId('traffic-menu-trigger').click();
     await expect(page.getByTestId('inject-traffic-i280')).toHaveAttribute('data-disabled', '');
   });

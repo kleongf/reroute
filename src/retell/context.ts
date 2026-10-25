@@ -12,11 +12,6 @@ const contextArgs = z.looseObject({
 /** The LLM's arguments can never override the signed call's Driver/Job/Offer identity. */
 export function retellCallContext(store: Store): MiddlewareHandler {
   return async (c, next) => {
-    // Signature verification still runs first; this capture-only tool has no fleet identity.
-    if (c.req.param('name') === 'tracer_ping') {
-      await next();
-      return undefined;
-    }
     let raw: unknown;
     try {
       raw = await c.req.json();
@@ -28,6 +23,12 @@ export function retellCallContext(store: Store): MiddlewareHandler {
     const { call, args, name } = parsed.data;
     const toolName = c.req.param('name');
     if (name && name !== toolName) return c.json({ result: 'Call tool does not match.' }, 400);
+    // Authentication has already verified the request. The tracer records evidence only;
+    // it cannot invoke any fleet command and deliberately has no fleet identity.
+    if (toolName === 'tracer_ping') {
+      await next();
+      return undefined;
+    }
     const identifiers = contextArgs.safeParse(args);
     if (!identifiers.success) return c.json({ result: 'Invalid call context.' }, 400);
     const vars = call.retell_llm_dynamic_variables ?? {};

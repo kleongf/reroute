@@ -45,6 +45,7 @@ describe('Retell HTTP transport', () => {
       from_number: '+15550000000',
       to_number: '+15550000002',
       override_agent_id: agentIds[kind],
+      override_agent_version: 'latest_published',
       idempotency_key: 'reroute_unique',
       retell_llm_dynamic_variables: {
         call_kind: kind,
