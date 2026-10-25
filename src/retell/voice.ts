@@ -32,6 +32,7 @@ export function createRetellVoice(options: RetellVoiceOptions): VoicePort {
           from_number: options.fromNumber,
           to_number: call.to,
           override_agent_id: options.agentIds[call.kind],
+          override_agent_version: 'latest_published',
           retell_llm_dynamic_variables: { ...vars, call_kind: call.kind },
           ...(vars['reroute_call_id'] ? { idempotency_key: vars['reroute_call_id'] } : {}),
         }),

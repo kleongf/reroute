@@ -61,9 +61,11 @@ test.describe('scenario', () => {
     await expect(page.getByTestId('map-provenance')).toBeVisible();
 
     await page.keyboard.press('Escape'); // close the Sheet to reach the top bar
+    await expect(page.getByTestId('drawer')).toBeHidden();
     const reset = page.waitForResponse('/api/reset');
     await page.getByTestId('reset').click();
     expect((await reset).ok()).toBe(true);
+    await page.getByTestId('drawer-toggle').click();
     await expect(drivers).toHaveCount(6);
     expect((await request.get('/api/state')).ok()).toBe(true);
   });

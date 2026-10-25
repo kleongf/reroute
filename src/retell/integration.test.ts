@@ -67,6 +67,50 @@ describe('authenticated Retell HTTP boundary', () => {
     args: { job_id: 'J17', reason: 'pneu crevé — cannot continue', collected: false },
   };
 
+  it('replays the four real redacted captures through authenticated HTTP and streams root-level speech', async () => {
+    const before = await h.state();
+    for (const file of [
+      'call_started.json',
+      'transcript_updated.json',
+      'call_ended.json',
+      'tool-call.json',
+    ]) {
+      const body = JSON.parse(
+        readFileSync(new URL(`../../fixtures/retell/tracer-call/${file}`, import.meta.url), 'utf8'),
+      ) as unknown;
+      const path = file === 'tool-call.json' ? '/tools/tracer_ping' : '/webhooks/retell';
+      expect((await post(path, body, false)).status).toBe(401);
+      const response = await post(path, body);
+      expect(response.status).toBe(file === 'tool-call.json' ? 200 : 204);
+      if (file === 'tool-call.json') {
+        expect(await response.json()).toEqual({
+          result: 'Tracer received. The backend connection is working.',
+        });
+        expect((await post(path, body)).status).toBe(200);
+      }
+    }
+    expect(await h.state()).toEqual(before);
+    expect(h.voice.calls).toHaveLength(0);
+    const stream = await app.request('/events');
+    const reader = stream.body?.getReader();
+    if (!reader) throw new Error('Missing SSE body');
+    let text = '';
+    for (
+      let index = 0;
+      index < 30 && !text.includes('The backend acknowledged the tracer test.');
+      index++
+    ) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      const value: unknown = chunk.value;
+      if (!(value instanceof Uint8Array)) throw new Error('Invalid SSE bytes');
+      text += new TextDecoder().decode(value);
+    }
+    await reader.cancel();
+    expect(text).toContain('event: transcript');
+    expect(text).toContain('The backend acknowledged the tracer test.');
+  });
+
   it.each([
     { file: 'call_started.json', path: '/webhooks/retell', status: 204 },
     { file: 'transcript_updated.json', path: '/webhooks/retell', status: 204 },
