@@ -50,15 +50,35 @@ Phone screen automation, live GPS, notifying anyone outside the fleet (shops, re
 - All times are relative to the moment "Reset demo" is pressed, on the real clock.
 - Map and dashboard label provenance: "simulated positions", "simulated traffic", "fixture ETA".
 
-Draft run order (expect revisions):
+Run of show (timings measured on real calls, 2026-10-24; about 3:30 total, fits a 3–5 minute slot). Roles: **Presenter** drives the laptop and narrates; **Phones** holds Alex's and Casey's phones on speaker next to the mic and answers each call.
 
-| Time | Action | Audience sees |
-|---|---|---|
-| 0:00–0:30 | Dashboard tour | Six Drivers on the map, Alex on J17 |
-| 0:30–1:30 | Inject "I-280 closed"; Reroute calls Alex, who can't make it | J17 At Risk → Late; live transcript |
-| 1:30–2:30 | Placement: ranking with reasons; Blair's simulated Offer declined; Reroute calls Casey, who accepts | Pending Offer → Placed; Blair's capacity updates |
-| 2:30–3:00 | Reroute calls Alex back | Assignment line moves Alex → Casey; elapsed time Disruption → Placed |
-| 3:00–4:00 | Dispatcher adds the Urgent Job below; Reroute calls Alex, who accepts | Queue, Placement, Placed |
+| Time | Presenter does / says | Phones | Audience sees |
+|---|---|---|---|
+| 0:00–0:25 | "Small fleets lose deadlines when one driver gets stuck. Reroute is a dispatcher you only talk to." Point at the map: six Drivers, Alex on the Oak Street pickup, due in an hour. | — | "All Jobs on track"; Drivers moving (simulated movement) |
+| 0:25–0:35 | **Inject traffic → I-280 closed.** "A closure just put Alex's pickup at risk. Nobody called anyone yet." | — | Red closure on the map; banner "J17 At Risk · checking with Alex"; Disruption card "Late by N min with Alex" |
+| 0:35–0:55 | "Reroute calls Alex first. His word decides." | **Alex** answers (rings ~5 s; call ~16 s): "No, I can't make it." → "Haven't picked them up." | Live transcript in the call card; banner turns Late |
+| 0:55–1:10 | "It ranks every Driver and says why the others can't." Point at the crossed-out list. | — | Placement card: Casey ranked; Dana "off at…", Eli "0 slots", Fran "arrives … >"; Blair's **simulated Offer** declines "only room for one" after ~4 s and her capacity drops |
+| 1:10–1:35 | "Now it offers the Job to Casey, with what she needs to decide." | **Casey** answers (rings ~5 s; call ~20 s): hears minutes to pickup, drop-off, minutes to spare → "Yes." | Dashed "awaiting acceptance" line → solid green; banner "J17 fixed · Casey has it, on time"; toast "J17 fixed in m:ss"; before → after on the card |
+| 1:35–1:45 | "And Alex is told he's off it." | **Alex** release call (~6 s): "It's Reroute. Casey has the Oak Street pickup; you're off it." | Tally "Disruptions fixed: 1 · avg time to fix" |
+| 1:45–2:10 | "New work arrives the same way." **+ Urgent Job** (prefilled with the values below) → Add. | — | Urgent Job appears with no Driver; Placement with reasons: Casey and Blair out on capacity |
+| 2:10–2:35 | "It goes to the one Driver who can still do it." | **Alex** answers the Offer (~20 s): "Yes." | Hospital samples Placed with Alex |
+| 2:35–3:30 | Recap: two phone conversations, no app, every decision explained on screen; the agent proposes, the backend authorizes. Point at the provenance strip: positions, traffic and Blair are simulated; calls are real. | Hold phones up | Final dashboard |
+
+If a phone misses an Offer, Reroute calls the same Driver again after 20 s (`OFFER_RETRY_MS`): keep talking ("it retries once before moving on"). If Casey misses both, J17 escalates; reset and rerun, or play the backup recording.
+
+### Before each recording or live run
+
+1. Phones: **Do Not Disturb / Focus off**, Silence Unknown Callers off, the Retell number saved as a contact, ringer and speaker on, charged.
+2. `.env`: `VOICE_MODE=retell`, `ROUTING` unset (the run order assumes fixture ETAs), `DISPATCHER_PHONE` a real person's phone (never the Retell number).
+3. Start `ngrok http --url=<static domain> 3000` and the server; `pnpm retell:point` must report 0 changes.
+4. Browser: Chrome, its own window, full screen (⌃⌘F), zoom 100% at 1920×1080 (or 1280×800 for the projector), bookmarks bar and extensions hidden, map tiles loaded (needs internet). Mac Do Not Disturb **on** so no notifications appear.
+5. Press **Reset demo** last, within a few minutes of starting: deadlines count from the reset.
+
+### Recording
+
+- Record the screen and the room mic together (QuickTime or OBS); the calls are heard through the phone speakers. Optional: an OBS camera source on the two phones in a corner.
+- Do one full take; never cut out a call (the timer and toast show real elapsed time). Label the file **"Recorded backup"** and say so if it's played instead of a live run.
+- After each take: `pnpm retell:calls --limit 5` (every tool result ✅), then Reset demo before the next take.
 
 Urgent Job to type on stage (exactly; covered by `src/demo/demo-story.test.ts`):
 
