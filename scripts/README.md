@@ -52,3 +52,13 @@ Steps run in the order given. Two-value flags use `::` as the separator. JSON st
 ```
 
 On a failing step it saves `NN-error.png`, records the error in `summary.json`, and exits 1.
+
+## `pnpm demo:record`
+
+After `pnpm build`, records the revised US-101 story through the real backend in
+an isolated in-memory database with FakeVoice. It never uses real phone numbers
+or places real calls. The persistent “Recorded demo · simulated calls” label and
+scripted transcript make the provenance explicit. The silent 1× WebM, player page,
+phase screenshots, server log and provenance JSON are saved in
+`artifacts/demo-backup/`. Run `pnpm build && pnpm demo:record` before presenting;
+this offline fallback does not replace the three real-phone rehearsals in #10.
