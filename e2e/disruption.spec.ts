@@ -22,8 +22,10 @@ test('a Disruption is shown, then shown fixed with before → after and the tall
   await expect(page.getByTestId('sse-status')).toHaveText('connected');
   await expect(page.getByTestId('banner')).toHaveText('All Jobs on track');
   await expect(page.getByTestId('tally')).toContainText('Disruptions fixed: 0');
+  await expect(page.getByTestId('fix-timer')).toHaveText('–:––');
 
   // Traffic check: J17 At Risk with Alex, pulsing on the map.
+  await page.getByTestId('traffic-menu-trigger').click();
   await page.getByTestId('inject-traffic-i280').click();
   const card = page.getByTestId('disruption-card').filter({ hasText: 'J17' });
   await expect(card).toHaveAttribute('data-status', 'at_risk');
@@ -77,8 +79,16 @@ test('a Disruption is shown, then shown fixed with before → after and the tall
   await expect(page.getByTestId('tally-avg')).toHaveText(/\d+:\d\d/);
   await expect(page.locator('.map-marker--pickup[data-health=fixed]')).toHaveCount(1);
   await expect(page.getByTestId('placement-status')).toHaveAttribute('data-status', 'placed');
+  await expect(page.getByTestId('fix-timer')).toHaveAttribute('data-state', 'placed');
+  await expect(page.getByText(/^J17 fixed in \d+:\d\d$/)).toHaveCount(1);
   await page.waitForTimeout(600); // banner colour transition
   await page.screenshot({ path: 'artifacts/screenshots/disruption-placed.png' });
+
+  // A reload is a fresh load, not a new fix: no toast.
+  await page.reload();
+  await expect(page.getByTestId('tally-fixed')).toHaveText('1');
+  await page.waitForTimeout(500);
+  await expect(page.getByText(/^J17 fixed in \d+:\d\d$/)).toHaveCount(0);
 });
 
 test('an Escalated Disruption is shown as not fixed', async ({ page, request }) => {
@@ -92,6 +102,7 @@ test('an Escalated Disruption is shown as not fixed', async ({ page, request }) 
     ),
   });
   await page.goto('/');
+  await expect(page.getByTestId('sse-status')).toHaveText('connected');
   await request.post('/tools/report_disruption', {
     data: tool(
       'report_disruption',

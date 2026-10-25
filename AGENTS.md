@@ -7,7 +7,7 @@ Voice-first fleet dispatcher, built for a 4-hour hackathon demo. Drivers talk to
 
 ## Done
 
-A change is done when `pnpm verify` passes **and** you have exercised the change yourself: for dashboard changes, run `pnpm ui:explore` and look at the screenshots and console logs; for backend changes, hit the endpoint or send a sample webhook. Usage of both scripts is in [`scripts/README.md`](scripts/README.md).
+A change is done when `pnpm verify` passes **and** you have exercised the change yourself: for dashboard changes (the React app in `web/`, served at `/`), run `pnpm ui:explore` against `/` and look at the screenshots and console logs; for backend changes, hit the endpoint or send a sample webhook. Usage of both scripts is in [`scripts/README.md`](scripts/README.md).
 
 ## Invariants
 

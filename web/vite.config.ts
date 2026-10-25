@@ -6,9 +6,9 @@ import { defineConfig } from 'vite';
 const BACKEND = process.env['BACKEND_URL'] ?? 'http://127.0.0.1:3000';
 const proxied = ['/api', '/events', '/tools', '/webhooks', '/health'];
 
-// Served by Hono at /next (see src/app.ts); built into <repo>/dist/web.
+// Served by Hono at / (see src/web-app.ts); built into <repo>/dist/web.
 export default defineConfig({
-  base: '/next/',
+  base: '/',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

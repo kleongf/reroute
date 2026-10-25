@@ -14,7 +14,7 @@
     "dev:web": "pnpm --filter @reroute/web dev",
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json && pnpm --filter @reroute/web build",
     "start": "node dist/server.js",
-    "typecheck": "tsc -p tsconfig.json && tsc -p public/tsconfig.json && pnpm --filter @reroute/web typecheck",
+    "typecheck": "tsc -p tsconfig.json && pnpm --filter @reroute/web typecheck",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
