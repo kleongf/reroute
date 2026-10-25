@@ -12,6 +12,11 @@ const contextArgs = z.looseObject({
 /** The LLM's arguments can never override the signed call's Driver/Job/Offer identity. */
 export function retellCallContext(store: Store): MiddlewareHandler {
   return async (c, next) => {
+    // Signature verification still runs first; this capture-only tool has no fleet identity.
+    if (c.req.param('name') === 'tracer_ping') {
+      await next();
+      return undefined;
+    }
     let raw: unknown;
     try {
       raw = await c.req.json();

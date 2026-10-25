@@ -36,5 +36,11 @@ export const retellToolSchema = z.looseObject({
   call: retellCallSchema,
   args: z.record(z.string(), z.unknown()).default({}),
 });
+/** Capture-only tool: no fleet Driver, Job, or Offer context is required. */
+export const tracerPingSchema = z.looseObject({
+  name: z.literal('tracer_ping'),
+  call: z.looseObject({ call_id: z.string().min(1) }),
+  args: z.looseObject({ message: z.string() }),
+});
 export type RetellCall = z.infer<typeof retellCallSchema>;
 export type RetellWebhook = z.infer<typeof retellWebhookSchema>;

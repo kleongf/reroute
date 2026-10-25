@@ -8,6 +8,7 @@ import { systemClock } from './domain/clock.ts';
 import { log } from './log.ts';
 import { createEngine } from './placement/engine.ts';
 import { createOsrmRouting } from './routing/osrm.ts';
+import { createTomTomRouting } from './routing/tomtom.ts';
 import { attachRoutedEtas } from './routing/refresh.ts';
 import { loadScenario, readScenarioFile } from './store/scenario.ts';
 import { createStore } from './store/store.ts';
@@ -24,6 +25,8 @@ const config = loadConfig();
 const db = openDatabase(config.DATABASE_PATH);
 // Resolves to <repo>/public from both src/server.ts (tsx) and dist/server.js (build).
 const publicDir = fileURLToPath(new URL('../public/', import.meta.url));
+// The web/ build (pnpm build); both entry points resolve to <repo>/dist/web.
+const webDir = fileURLToPath(new URL('../dist/web/', import.meta.url));
 
 const scenario = readScenarioFile(fileURLToPath(new URL('../fixtures/demo.json', import.meta.url)));
 const phones = process.env;
@@ -31,6 +34,18 @@ const store = createStore(db, loadScenario(scenario, systemClock.now(), phones))
 // ROUTING=osrm: routed ETAs replace fixture ones in the background after each reset / Urgent Job.
 if (config.ROUTING === 'osrm') {
   attachRoutedEtas(store, createOsrmRouting({ timeoutMs: config.ROUTING_TIMEOUT_MS }));
+}
+// ROUTING=tomtom: same, but live-traffic ETAs (source 'traffic') from one TomTom matrix request.
+if (config.ROUTING === 'tomtom') {
+  if (!config.TOMTOM_API_KEY) throw new Error('ROUTING=tomtom needs TOMTOM_API_KEY');
+  attachRoutedEtas(
+    store,
+    createTomTomRouting({
+      apiKey: config.TOMTOM_API_KEY,
+      // TomTom's synchronous matrix is slower than OSRM: default 2 s unless set explicitly.
+      timeoutMs: process.env['ROUTING_TIMEOUT_MS'] ? config.ROUTING_TIMEOUT_MS : 2_000,
+    }),
+  );
 }
 // Persist outbound calls before returning tool results; dispatch through Retell in the background.
 const outbox =
@@ -73,6 +88,7 @@ const app = createApp({
   clock: systemClock,
   heartbeatMs: config.HEARTBEAT_MS,
   publicDir,
+  webDir,
   store,
   scenario,
   phones,

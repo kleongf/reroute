@@ -14,8 +14,10 @@ const envSchema = z.object({
   RETELL_AGENT_ESCALATION: z.string().min(1).optional(),
   SIMULATED_OFFER_MS: z.coerce.number().int().min(0).default(4_000),
   /** osrm = refresh ETAs from the public OSRM demo server; off = fixture/straight-line only. */
-  ROUTING: z.enum(['osrm', 'off']).default('off'),
+  /** tomtom = live-traffic ETAs from TomTom Matrix Routing v2 (needs TOMTOM_API_KEY). */
+  ROUTING: z.enum(['osrm', 'tomtom', 'off']).default('off'),
   ROUTING_TIMEOUT_MS: z.coerce.number().int().positive().default(1_500),
+  TOMTOM_API_KEY: z.string().min(1).optional(),
 });
 
 export type Config = z.infer<typeof envSchema>;

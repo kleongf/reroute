@@ -1,4 +1,5 @@
 import { createHmac } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../app.ts';
@@ -65,6 +66,35 @@ describe('authenticated Retell HTTP boundary', () => {
     },
     args: { job_id: 'J17', reason: 'pneu crevé — cannot continue', collected: false },
   };
+
+  it.each([
+    { file: 'call_started.json', path: '/webhooks/retell', status: 204 },
+    { file: 'transcript_updated.json', path: '/webhooks/retell', status: 204 },
+    { file: 'call_ended.json', path: '/webhooks/retell', status: 204 },
+    { file: 'tool-call.json', path: '/tools/tracer_ping', status: 200 },
+  ])(
+    'replays signed live $file captures without fleet changes or lost fields',
+    async ({ file, path, status }) => {
+      const body: unknown = JSON.parse(
+        readFileSync(new URL(`../../fixtures/retell/tracer-call/${file}`, import.meta.url), 'utf8'),
+      );
+      const before = await h.state();
+      expect((await post(path, body, false)).status).toBe(401);
+      expect(h.db.prepare('SELECT * FROM webhook_events').all()).toHaveLength(0);
+      const response = await post(path, body);
+      expect(response.status).toBe(status);
+      const row = h.db.prepare('SELECT payload FROM webhook_events').get();
+      expect(JSON.parse(String(row?.['payload'])) as unknown).toEqual(body);
+      if (path === '/tools/tracer_ping') {
+        const replay = await post(path, body);
+        expect(replay.status).toBe(200);
+        expect(await replay.json()).toEqual(await response.json());
+        expect(h.db.prepare('SELECT * FROM webhook_events').all()).toHaveLength(1);
+      }
+      expect(await h.state()).toEqual(before);
+      expect(h.voice.calls).toHaveLength(0);
+    },
+  );
 
   it('rejects unsigned, tampered, malformed signatures, and old requests before mutation', async () => {
     expect((await post('/tools/report_disruption', disruption, false)).status).toBe(401);

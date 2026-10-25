@@ -566,13 +566,17 @@ function offerBadge(o) {
 }
 
 /**
- * "routed ETA" or "fixture ETA" (fixture table, or straight line for Urgent Jobs).
+ * "live traffic ETA", "routed ETA" or "fixture ETA" (fixture table, or straight line for Urgent Jobs).
  * @param {StateSnapshot} s
  * @param {string} driverId
  * @param {string} jobId
  */
 const etaLabel = (s, driverId, jobId) =>
-  s.etas.source[driverId]?.[jobId] === 'routed' ? 'routed ETA' : 'fixture ETA';
+  s.etas.source[driverId]?.[jobId] === 'traffic'
+    ? 'live traffic ETA'
+    : s.etas.source[driverId]?.[jobId] === 'routed'
+      ? 'routed ETA'
+      : 'fixture ETA';
 
 /** @param {Model} m */
 function renderPlacement(m) {
@@ -798,21 +802,29 @@ urgentForm.addEventListener('submit', (event) => {
 // ---- Provenance + render loop ----
 
 const provenanceEl = requireElement('provenance');
+/** True while the map shows simulated vehicle movement. */
+let vehiclesMoving = false;
 
 /** @param {StateSnapshot} s */
 function renderProvenance(s) {
   const sources = new Set(Object.values(s.etas.source).flatMap((row) => Object.values(row)));
   const labels = ['simulated positions'];
+  if (sources.has('traffic')) labels.push('live traffic ETA');
   if (sources.has('routed')) labels.push('routed ETA');
   if (sources.has('fixture') || sources.size === 0) labels.push('fixture ETA');
   if (s.activeTraffic.length > 0) labels.push('simulated traffic');
   if (s.placements.some((p) => p.offers.some((o) => o.simulated))) labels.push('simulated Offer');
+  if (vehiclesMoving) labels.push('simulated movement');
   provenanceEl.textContent = labels.join(' · ');
 }
 
 const map = initMap(requireElement('map'), {
   paddingTopLeft: [400, 90],
   paddingBottomRight: [380, 50],
+  onMotionChange(moving) {
+    vehiclesMoving = moving;
+    if (latest) renderProvenance(latest);
+  },
 });
 
 /** @param {StateSnapshot} s */
