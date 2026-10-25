@@ -138,6 +138,18 @@ export function createEngine({
     };
   }
 
+  /** What a Driver needs to decide on an Offer: how far, where to, and how much slack. */
+  function decisionVars(job: Job, etaToPickupMinutes: number): Record<string, string> {
+    const minutesLeft = (Date.parse(job.deadline) - clock.now().getTime()) / 60_000;
+    const needed = etaToPickupMinutes + job.serviceMinutes + job.tripMinutes;
+    return {
+      eta_to_pickup_minutes: String(Math.round(etaToPickupMinutes)),
+      dropoff_name: job.dropoff.name,
+      trip_minutes: String(Math.round(job.tripMinutes)),
+      minutes_to_spare: String(Math.max(0, Math.floor(minutesLeft - needed))),
+    };
+  }
+
   /** Starts the highest-Priority queued Placement if none is running. */
   async function startNext(): Promise<void> {
     const started = store.update((w) => {
@@ -204,7 +216,13 @@ export function createEngine({
         kind: 'offer',
         offerId,
         to: driver.phone,
-        vars: { call_kind: 'offer', driver_id: driver.id, offer_id: offerId, ...jobVars(job) },
+        vars: {
+          call_kind: 'offer',
+          driver_id: driver.id,
+          offer_id: offerId,
+          ...jobVars(job),
+          ...decisionVars(job, top.etaToPickupMinutes),
+        },
       };
     });
     if (!call) return;

@@ -135,6 +135,19 @@ describe('Declines, Unanswered, Escalation', () => {
     });
   });
 
+  it('an Offer call carries what the Driver needs to decide: distance, drop-off, and slack', async () => {
+    await reachCasey();
+    const offer = h.voice.calls.find((c) => c.kind === 'offer');
+    // Casey: 9 min to the Oak Street Pickup (fixture), 3 min service, 15 min trip, due in 60.
+    expect(offer?.vars).toMatchObject({
+      driver_id: 'casey',
+      eta_to_pickup_minutes: '9',
+      dropoff_name: 'Mission Bay Clinic',
+      trip_minutes: '15',
+      minutes_to_spare: '33',
+    });
+  });
+
   it('an Unanswered Offer is retried once after a delay, then the Placement moves on', async () => {
     const offer = await reachCasey();
     const res = await h.post('/webhooks/retell', {

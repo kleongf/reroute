@@ -105,6 +105,10 @@ describe('Disruption → Placement → Accept', () => {
           pickup_name: 'Oak Street Florist',
           deadline_spoken: '8:00 AM',
           parcels: '2',
+          eta_to_pickup_minutes: '9',
+          dropoff_name: 'Mission Bay Clinic',
+          trip_minutes: '15',
+          minutes_to_spare: '33',
         },
       },
     ]);

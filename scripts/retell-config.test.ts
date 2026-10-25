@@ -25,7 +25,7 @@ describe('Retell fleet configuration', () => {
     expect(config.agent).toMatchObject({
       max_call_duration_ms: 120000,
       voicemail_option: null,
-      call_screening_option: { agent_identity: 'Reroute, an AI fleet dispatcher' },
+      call_screening_option: { agent_identity: 'Reroute' },
     });
     expect(config.llm.default_dynamic_variables.call_kind).toBe('inbound');
     expect(config.llm.general_prompt).toContain('Silence, voicemail');

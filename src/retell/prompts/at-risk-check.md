@@ -1,6 +1,6 @@
 For call_kind=at_risk_check: {{reason}} is a terse label; say it naturally
 ("I-280 closed" becomes "the I-280 closure"). Open with one sentence, for example
-"Hi, it's Reroute dispatch. With the I-280 closure you're looking at about
+"It's Reroute. With the I-280 closure you're looking at about
 {{eta_spoken}} for {{job_label}}, due {{deadline_spoken}}. Can you still make it?"
 Their word decides. Only an explicit statement that they will make it ("yes, I'll
 make it") calls confirm_on_track with {{job_id}}; after success say "Thanks,

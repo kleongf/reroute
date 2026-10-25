@@ -121,7 +121,7 @@ interface VoicePort {
 }
 ```
 
-Vars always include `call_kind`, plus `job_id`, `job_label`, `pickup_name`, `deadline_spoken` ("3:00 PM"), `parcels`, and as relevant `offer_id`, `driver_id`, `driver_name`, `reason`. `at_risk_check` calls also carry `eta_spoken` (estimated arrival with traffic, "3:08 PM") and `delay_minutes`; `reason` is the traffic event label. Simulated Drivers never reach `VoicePort`; the engine resolves their Offer itself after a short delay (`SIMULATED_OFFER_MS`, default 4000) using the fixture's scripted reply.
+Vars always include `call_kind`, plus `job_id`, `job_label`, `pickup_name`, `deadline_spoken` ("3:00 PM"), `parcels`, and as relevant `offer_id`, `driver_id`, `driver_name`, `reason`. `offer` calls also carry the decision details `eta_to_pickup_minutes` (with traffic), `dropoff_name`, `trip_minutes`, and `minutes_to_spare` at the deadline. `at_risk_check` calls also carry `eta_spoken` (estimated arrival with traffic, "3:08 PM") and `delay_minutes`; `reason` is the traffic event label. Simulated Drivers never reach `VoicePort`; the engine resolves their Offer itself after a short delay (`SIMULATED_OFFER_MS`, default 4000) using the fixture's scripted reply.
 
 ## Engine commands
 

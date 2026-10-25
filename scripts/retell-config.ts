@@ -84,6 +84,10 @@ export function buildRetellConfig(baseUrl: string) {
         eta_spoken: '',
         delay_minutes: '',
         reason: '',
+        eta_to_pickup_minutes: '',
+        dropoff_name: '',
+        trip_minutes: '',
+        minutes_to_spare: '',
       },
       general_tools: [
         ...tools.map((tool) => ({
@@ -114,8 +118,8 @@ export function buildRetellConfig(baseUrl: string) {
       max_call_duration_ms: 120000,
       voicemail_option: null,
       call_screening_option: {
-        agent_identity: 'Reroute, an AI fleet dispatcher',
-        call_purpose: 'delivery coordination for this Driver',
+        agent_identity: 'Reroute',
+        call_purpose: 'a delivery',
       },
     },
   };

@@ -124,7 +124,19 @@ for (const agentId of agentIds) {
       `  general_prompt: ${String(typeof llm['general_prompt'] === 'string' ? llm['general_prompt'].length : 0)} → ${String(prompt.length)} chars`,
     );
   }
-  const count = pending.length + (webhookStale ? 1 : 0) + (promptStale ? 1 : 0);
+  const screening = values['sync-prompt']
+    ? buildRetellConfig(base).agent.call_screening_option
+    : null;
+  const screeningStale =
+    screening !== null &&
+    JSON.stringify(published['call_screening_option']) !== JSON.stringify(screening);
+  if (screeningStale) {
+    console.log(
+      `  call_screening_option: ${JSON.stringify(published['call_screening_option'])} → ${JSON.stringify(screening)}`,
+    );
+  }
+  const count =
+    pending.length + (webhookStale ? 1 : 0) + (promptStale ? 1 : 0) + (screeningStale ? 1 : 0);
   changes += count;
   if (count === 0) {
     console.log('  already current');
@@ -146,6 +158,7 @@ for (const agentId of agentIds) {
   });
   await retell('PATCH', `/update-agent/${agentId}?version=${draftVersion}`, {
     webhook_url: webhook,
+    ...(screening === null ? {} : { call_screening_option: screening }),
   });
   await retell('POST', `/publish-agent-version/${agentId}`, {
     version: Number(draftVersion),
