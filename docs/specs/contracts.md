@@ -168,6 +168,10 @@ body is signature-verified and successful retries replay their original result,
 but it does not require a fleet Driver/Job/Offer identity. It cannot change fleet
 state. All six fleet tools retain the signed-call identity checks.
 
+Outbound REST calls use `RETELL_API_KEY`. Signature verification uses
+`RETELL_WEBHOOK_API_KEY` when configured, otherwise `RETELL_API_KEY`; the signing
+value must be the workspace's API key marked Webhook.
+
 Status fields, shared by `report_status` and `decline_offer`: `capacity?` (int ≥ 0), `available_from?`, `available_until?` (ISO, or spoken "4 PM" / "16:30" / bare "4" = next 4 o'clock, demo time zone). `decline_offer` also takes `offer_id?` (else vars) and `reason?`. Escalation calls carry `reason` (one sentence) plus the Job vars.
 
 ## SSE
